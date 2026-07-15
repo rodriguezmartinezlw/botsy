@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import FormularioLogin from "./FormularioLogin";
 
 export const metadata: Metadata = {
   title: "Iniciar sesión",
 };
 
 /**
- * Login estático (WP-00). Sin lógica de autenticación: se conecta en WP-01.
- * Lee ?rol=profesional para adaptar el encabezado.
+ * Login (WP-01): encabezado en servidor (adapta según ?rol=profesional) +
+ * formulario cliente conectado a Supabase Auth.
  */
 export default async function LoginPage({
   searchParams,
@@ -30,39 +31,7 @@ export default async function LoginPage({
         </p>
       </div>
 
-      <form className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1.5">
-          <span className="text-base font-medium text-texto">
-            Correo electrónico
-          </span>
-          <input
-            type="email"
-            name="email"
-            autoComplete="email"
-            placeholder="tucorreo@ejemplo.com"
-            className="h-12 rounded-[var(--radius-md)] border border-borde bg-superficie px-4 text-base text-texto placeholder:text-texto-tenue"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1.5">
-          <span className="text-base font-medium text-texto">Contraseña</span>
-          <input
-            type="password"
-            name="password"
-            autoComplete="current-password"
-            placeholder="••••••••"
-            className="h-12 rounded-[var(--radius-md)] border border-borde bg-superficie px-4 text-base text-texto placeholder:text-texto-tenue"
-          />
-        </label>
-
-        <button
-          type="button"
-          disabled
-          className="mt-2 flex h-12 items-center justify-center rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white disabled:opacity-60"
-        >
-          Entrar
-        </button>
-      </form>
+      <FormularioLogin />
 
       <p className="text-center text-base text-texto-suave">
         ¿No tienes cuenta?{" "}

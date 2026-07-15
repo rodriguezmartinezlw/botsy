@@ -84,8 +84,9 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP | Estado |
 |---|---|
 | WP-00 | ✅ aprobado (commit) — ver `docs/revisiones/WP-00-revision.md` |
-| WP-01 | ▶️ siguiente |
-| WP-02…WP-08 | ⏳ pendiente |
+| WP-01 | ✅ aprobado (commit) — ver `docs/revisiones/WP-01-revision.md` |
+| WP-02 | ▶️ siguiente |
+| WP-03…WP-08 | ⏳ pendiente |
 
 *(El director actualiza esta tabla en cada commit.)*
 

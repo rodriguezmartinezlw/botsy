@@ -1,11 +1,24 @@
 import type { ReactNode } from "react";
+import { redirect } from "next/navigation";
 import NavLateral from "@/components/panel/NavLateral";
+import { obtenerRolSesion } from "@/lib/auth/sesion";
 
 /**
  * Layout del panel profesional.
  * Escritorio: sidebar a la izquierda + contenido. Móvil: barra superior + contenido.
+ *
+ * Route guard (WP-01): requiere sesión de profesional o admin leída en
+ * servidor. Sin sesión -> /login; pacientes -> su app (/inicio).
  */
-export default function PanelLayout({ children }: { children: ReactNode }) {
+export default async function PanelLayout({
+  children,
+}: {
+  children: ReactNode;
+}) {
+  const rol = await obtenerRolSesion();
+  if (!rol) redirect("/login");
+  if (rol !== "profesional" && rol !== "admin") redirect("/inicio");
+
   return (
     <div className="flex min-h-dvh flex-col bg-fondo md:flex-row">
       <NavLateral />
