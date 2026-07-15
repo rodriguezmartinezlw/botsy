@@ -132,8 +132,33 @@ export const esquemaCuerpoFinalizar = z
   })
   .strict();
 
+/**
+ * Cuerpo de `POST /api/voz/tool`: la tool-call reenviada desde el data channel
+ * del modelo Realtime. Aquí solo se valida la ENVOLTURA; los argumentos
+ * (`argumentosJson`) se validan dentro con los esquemas por-tool de arriba
+ * (mismos que el modo texto).
+ */
+export const esquemaCuerpoToolVoz = z
+  .object({
+    checkinId: z.string().uuid(),
+    callId: z.string().min(1).max(200),
+    nombre: z.string().min(1).max(80),
+    argumentosJson: z.string().max(20000),
+  })
+  .strict();
+
+/** Cuerpo de `POST /api/voz/finalizar`: como el de texto + ruta de audio opcional. */
+export const esquemaCuerpoFinalizarVoz = z
+  .object({
+    checkinId: z.string().uuid(),
+    audioPath: z.string().min(1).max(400).optional(),
+  })
+  .strict();
+
 export type CuerpoMensaje = z.infer<typeof esquemaCuerpoMensaje>;
 export type CuerpoFinalizar = z.infer<typeof esquemaCuerpoFinalizar>;
+export type CuerpoToolVoz = z.infer<typeof esquemaCuerpoToolVoz>;
+export type CuerpoFinalizarVoz = z.infer<typeof esquemaCuerpoFinalizarVoz>;
 
 // --- Envoltura de la respuesta de OpenAI (Chat Completions) ------------------
 // Se valida la forma de la respuesta del proveedor antes de usarla.

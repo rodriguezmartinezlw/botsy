@@ -86,7 +86,7 @@ export type ResultadoTurno = {
   resumenSugerido: string | null;
 };
 
-type ResultadoHerramienta = {
+export type ResultadoHerramienta = {
   mensaje: string;
   riesgo?: NivelRiesgo;
   finalizar?: boolean;
@@ -102,7 +102,16 @@ function parsearArgumentos(json: string): unknown {
   }
 }
 
-async function ejecutarHerramienta(
+/**
+ * Ejecuta UNA tool-call: parsea sus argumentos, los VALIDA con el esquema Zod
+ * correspondiente (mismos schemas de WP-02) y, si son válidos, los persiste a
+ * través del repositorio; si no, devuelve un mensaje de error para que el
+ * modelo corrija y NO persiste nada. Reutilizada tanto por el loop de texto
+ * (`ejecutarTurno`) como por el canal de voz (`/api/voz/tool` vía
+ * `manejarToolVoz`): la lógica de validación/persistencia/escalado-en-vivo es
+ * única para los dos transportes.
+ */
+export async function ejecutarHerramienta(
   llamada: LlamadaHerramienta,
   repositorio: RepositorioCheckin,
   dominios: Set<DominioCheckin>,

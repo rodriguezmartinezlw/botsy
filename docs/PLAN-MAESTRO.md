@@ -87,8 +87,9 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-01 | ✅ aprobado (commit) — ver `docs/revisiones/WP-01-revision.md` |
 | WP-02 | ✅ aprobado (commit) — ver `docs/revisiones/WP-02-revision.md` |
 | WP-04 | ✅ aprobado (commit) — ver `docs/revisiones/WP-04-revision.md` |
-| WP-03 | ▶️ siguiente (check-in por voz) |
-| WP-05…WP-08 | ⏳ pendiente |
+| WP-03 | ✅ aprobado (commit) — ver `docs/revisiones/WP-03-revision.md` |
+| WP-05 | ▶️ siguiente (perfil del paciente) |
+| WP-06…WP-08 | ⏳ pendiente |
 
 *(El director actualiza esta tabla en cada commit.)*
 

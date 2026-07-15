@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { MessagesSquare } from "lucide-react";
+import Link from "next/link";
+import { MessagesSquare, Mic } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import type { VerticalPaciente } from "@/types/db";
@@ -38,6 +39,13 @@ export default async function CheckinPage() {
         descripcion="Cuéntame cómo te encuentras. Yo te voy preguntando lo que falte."
         icono={<MessagesSquare className="h-6 w-6" aria-hidden />}
       />
+      <Link
+        href="/checkin/voz"
+        className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-base font-semibold text-primario transition-colors hover:bg-primario-suave"
+      >
+        <Mic className="h-5 w-5" aria-hidden />
+        Prefiero hablar
+      </Link>
       <ChatCheckin vertical={vertical} />
     </div>
   );

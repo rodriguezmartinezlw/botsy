@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame, Home, MessagesSquare } from "lucide-react";
+import { Flame, Home, MessagesSquare, Mic } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { fechaHoyEnZona } from "@/lib/ia/conversacion";
@@ -74,8 +74,6 @@ export default async function InicioPage() {
       ? "Tienes un check-in a medias. ¿Lo terminamos?"
       : "Aún no has hecho tu check-in de hoy.";
 
-  const textoCta = enCurso ? "Continuar mi check-in" : "Empezar mi check-in";
-
   return (
     <div className="flex flex-col gap-8">
       <EncabezadoPagina
@@ -117,13 +115,23 @@ export default async function InicioPage() {
             Ver mi check-in
           </Link>
         ) : (
-          <Link
-            href="/checkin"
-            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
-          >
-            <MessagesSquare className="h-5 w-5" aria-hidden />
-            {textoCta}
-          </Link>
+          <div className="flex flex-col gap-3">
+            {/* Elegir modo: hablar (voz) o escribir (texto). */}
+            <Link
+              href="/checkin/voz"
+              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
+            >
+              <Mic className="h-5 w-5" aria-hidden />
+              Hablar con Botsy
+            </Link>
+            <Link
+              href="/checkin"
+              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-lg font-semibold text-primario transition-colors hover:bg-primario-suave"
+            >
+              <MessagesSquare className="h-5 w-5" aria-hidden />
+              {enCurso ? "Continuar por escrito" : "Prefiero escribir"}
+            </Link>
+          </div>
         )}
       </section>
 
