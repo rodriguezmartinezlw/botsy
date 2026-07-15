@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+/*
+  Tema base de Botsy — F1: modo claro únicamente.
+  Estética calmada apta para perfil geriátrico: azul sanitario, acento verde salud,
+  fondos claros cálidos, radios generosos, tipografía base >=16px.
+*/
+
+:root {
+  /* Marca */
+  --color-primario: #2563eb; /* azul sanitario */
+  --color-primario-fuerte: #1d4ed8;
+  --color-primario-suave: #dbeafe;
+  --color-acento: #10b981; /* verde salud */
+  --color-acento-fuerte: #059669;
+  --color-acento-suave: #d1fae5;
+
+  /* Semánticos de escalado (referencia para WP-04; sin uso lógico aquí) */
+  --color-vigilancia: #f59e0b;
+  --color-urgencia: #dc2626;
+
+  /* Superficies (claras y cálidas) */
+  --color-fondo: #faf9f6;
+  --color-superficie: #ffffff;
+  --color-superficie-suave: #f4f2ee;
+  --color-borde: #e7e2d9;
+
+  /* Texto */
+  --color-texto: #1f2937;
+  --color-texto-suave: #4b5563;
+  --color-texto-tenue: #6b7280;
+
+  /* Radios generosos */
+  --radio-sm: 0.5rem;
+  --radio-md: 0.875rem;
+  --radio-lg: 1.25rem;
+  --radio-xl: 1.75rem;
+}
+
+/* Exponer variables como tokens de Tailwind v4 (utilidades bg-*, text-*, rounded-*) */
+@theme inline {
+  --color-primario: var(--color-primario);
+  --color-primario-fuerte: var(--color-primario-fuerte);
+  --color-primario-suave: var(--color-primario-suave);
+  --color-acento: var(--color-acento);
+  --color-acento-fuerte: var(--color-acento-fuerte);
+  --color-acento-suave: var(--color-acento-suave);
+  --color-vigilancia: var(--color-vigilancia);
+  --color-urgencia: var(--color-urgencia);
+  --color-fondo: var(--color-fondo);
+  --color-superficie: var(--color-superficie);
+  --color-superficie-suave: var(--color-superficie-suave);
+  --color-borde: var(--color-borde);
+  --color-texto: var(--color-texto);
+  --color-texto-suave: var(--color-texto-suave);
+  --color-texto-tenue: var(--color-texto-tenue);
+
+  --radius-sm: var(--radio-sm);
+  --radius-md: var(--radio-md);
+  --radius-lg: var(--radio-lg);
+  --radius-xl: var(--radio-xl);
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif;
+}
+
+html {
+  /* Base >=16px para accesibilidad (perfil geriátrico) */
+  font-size: 16px;
+}
+
+body {
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  font-family: var(--font-sans);
+  font-size: 1rem; /* 16px */
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Foco visible y accesible en toda la app */
+:focus-visible {
+  outline: 3px solid var(--color-primario);
+  outline-offset: 2px;
+}
