@@ -7,6 +7,7 @@
  * Next 16: autorización dentro del handler; pertenencia verificada.
  */
 
+import type { NivelRiesgo } from "@/types/db";
 import { respuestaError, respuestaOk } from "@/lib/http";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import {
@@ -16,6 +17,11 @@ import {
 } from "@/lib/ia/conversacion";
 import { reconciliar } from "@/lib/ia/extraccion";
 import { esquemaCuerpoFinalizar } from "@/lib/ia/schemas";
+import { evaluarCheckin } from "@/lib/escalado/motor";
+import {
+  aplicarEscalado,
+  crearRepositorioAccionesServicio,
+} from "@/lib/escalado/acciones";
 
 export async function POST(request: Request): Promise<Response> {
   let cuerpo: unknown;
@@ -46,7 +52,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const { data: paciente } = await supabase
       .from("pacientes")
-      .select("racha_actual, racha_maxima, ultimo_checkin")
+      .select("racha_actual, racha_maxima, ultimo_checkin, telefono_medico")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -56,6 +62,7 @@ export async function POST(request: Request): Promise<Response> {
         estado: "completado",
         resumen: checkin.resumen ?? "",
         riesgo: checkin.riesgo,
+        telefono_medico: paciente?.telefono_medico ?? null,
         racha_actual: paciente?.racha_actual ?? 0,
         racha_maxima: paciente?.racha_maxima ?? 0,
         reconciliadas: 0,
@@ -84,6 +91,26 @@ export async function POST(request: Request): Promise<Response> {
       checkin.fecha,
     );
 
+    // Escalado determinista (WP-04): evalúa TODAS las reglas del check-in, crea
+    // alertas idempotentes + auditoría (RF-ES-06) y sube el riesgo (nunca lo
+    // baja). Best-effort: nunca impide cerrar el check-in (p. ej. si falta el
+    // acceso de servicio o el proveedor). Se ejecuta antes del resumen para que
+    // este y la respuesta reflejen el nivel definitivo.
+    let riesgoFinal: NivelRiesgo | null = checkin.riesgo;
+    try {
+      const evaluacion = await evaluarCheckin(checkinId);
+      if (
+        evaluacion.nivel !== "normal" &&
+        evaluacion.reglasDisparadas.length > 0
+      ) {
+        const repoAcciones = await crearRepositorioAccionesServicio();
+        const res = await aplicarEscalado(evaluacion, repoAcciones);
+        riesgoFinal = res.riesgoFinal ?? riesgoFinal;
+      }
+    } catch {
+      // El escalado no debe tumbar el cierre del check-in.
+    }
+
     const resumen =
       checkin.resumen ??
       construirResumen({
@@ -97,7 +124,7 @@ export async function POST(request: Request): Promise<Response> {
         })),
         tomas: (tomas ?? []).map((t) => ({ estado: t.estado })),
         rachaActual: nuevaRacha.racha_actual,
-        riesgo: checkin.riesgo,
+        riesgo: riesgoFinal,
       });
 
     const duracionSeg = Math.max(
@@ -132,7 +159,8 @@ export async function POST(request: Request): Promise<Response> {
     return respuestaOk({
       estado: "completado",
       resumen,
-      riesgo: checkin.riesgo,
+      riesgo: riesgoFinal,
+      telefono_medico: paciente?.telefono_medico ?? null,
       racha_actual: nuevaRacha.racha_actual,
       racha_maxima: nuevaRacha.racha_maxima,
       reconciliadas: recon.insertadas,

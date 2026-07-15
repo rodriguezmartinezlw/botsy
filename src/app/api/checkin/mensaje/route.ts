@@ -20,6 +20,11 @@ import {
 } from "@/lib/ia/conversacion";
 import { ejecutarTurno } from "@/lib/ia/loop";
 import { crearRepositorioSupabase } from "@/lib/ia/repositorio-supabase";
+import { cargarReglasSenal, evaluarCheckin } from "@/lib/escalado/motor";
+import {
+  aplicarEscalado,
+  crearRepositorioAccionesServicio,
+} from "@/lib/escalado/acciones";
 import { esquemaCuerpoMensaje } from "@/lib/ia/schemas";
 
 export async function POST(request: Request): Promise<Response> {
@@ -85,6 +90,11 @@ export async function POST(request: Request): Promise<Response> {
     const instrucciones = construirInstrucciones(contexto);
     const dominiosPrevios = parsearDominiosCubiertos(checkin.dominios_cubiertos);
 
+    // Reglas `senal` aplicables para clasificar señales EN VIVO (no espera al
+    // cierre). Best-effort: si no hay acceso de servicio, se cae al mínimo
+    // conservador (`contactar`) sin romper la conversación.
+    const reglasSenal = await cargarReglasSenal(user.id, contexto.vertical);
+
     const { repositorio, obtenerRiesgo, obtenerDominios } =
       crearRepositorioSupabase({
         supabase,
@@ -106,6 +116,7 @@ export async function POST(request: Request): Promise<Response> {
         contexto: {
           vertical: contexto.vertical,
           dominiosYaCubiertos: dominiosPrevios,
+          reglasSenal,
         },
       });
     } catch {
@@ -133,6 +144,27 @@ export async function POST(request: Request): Promise<Response> {
     ]);
     if (errMensajes) {
       return respuestaError("No se pudo guardar la conversación.", 500);
+    }
+
+    // Materialización INMEDIATA de la alerta al profesional (RF-ES-03/04): si el
+    // turno elevó el riesgo, no esperamos al cierre del check-in. El profesional
+    // debe enterarse aunque el paciente abandone tras ver la pantalla de urgencia.
+    // Reutiliza la misma maquinaria idempotente que /finalizar (dedupe por
+    // checkin+regla), así que no duplica. Best-effort: nunca tumba la respuesta.
+    const riesgoTurno = obtenerRiesgo();
+    if (riesgoTurno === "contactar" || riesgoTurno === "urgencia") {
+      try {
+        const evaluacion = await evaluarCheckin(checkinId);
+        if (
+          evaluacion.nivel !== "normal" &&
+          evaluacion.reglasDisparadas.length > 0
+        ) {
+          const repoAcciones = await crearRepositorioAccionesServicio();
+          await aplicarEscalado(evaluacion, repoAcciones);
+        }
+      } catch {
+        // El escalado no debe impedir responder al paciente.
+      }
     }
 
     return respuestaOk({

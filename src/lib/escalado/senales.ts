@@ -1,38 +1,59 @@
 /**
- * Escalado — STUB de F1 (WP-02).
+ * Escalado en vivo — evaluación de SEÑALES durante la conversación (WP-04).
  *
- * El motor de reglas completo (niveles normal/vigilancia/contactar/urgencia
- * evaluados contra `reglas_escalado`, generación de `alertas` con evidencia,
- * auditoría) es responsabilidad de WP-04. Aquí solo dejamos el PUNTO DE
- * INTEGRACIÓN que usa el tool `senal_alarma` durante la conversación:
- * `evaluarSenal` recibe una señal detectada por el modelo y devuelve el nivel
- * de riesgo y el mensaje calmado que el asistente debe transmitir.
+ * `evaluarSenal` se invoca desde `src/lib/ia/loop.ts` cuando el modelo emite el
+ * tool `senal_alarma`. Clasifica la señal SIN esperar al cierre del check-in y
+ * devuelve el nivel de riesgo, el motivo y una instrucción de TONO para el
+ * modelo. Es PURA y SÍNCRONA (sin IO): la firma que ya consume `loop.ts` se
+ * mantiene intacta; la evaluación fina contra `reglas_escalado` de tipo `senal`
+ * se hace pasando esas reglas (ya cargadas por quien tiene acceso) en
+ * `EntradaSenal.reglas` — campo OPCIONAL, de modo que llamadas sin reglas siguen
+ * comportándose de forma conservadora.
  *
- * Comportamiento F1 (deliberadamente conservador y simple, no clínico):
- * toda señal de alarma detectada se trata como `contactar` COMO MÍNIMO. La
- * clasificación fina (p. ej. urgencia por combinación dolor torácico + disnea
- * en vertical cardiovascular) la hará WP-04 leyendo `reglas_escalado`; ese
- * motor podrá ELEVAR el nivel, nunca rebajarlo por debajo de lo que aquí se
- * fija. No implementamos esa lógica aquí para no invadir el alcance de WP-04.
+ * Comportamiento:
+ *  - Si alguna regla `senal` activa casa con el código de la señal (`tipo`),
+ *    se usa su nivel (puede ser `urgencia`) y su nombre como motivo.
+ *  - Si no hay regla que case, toda señal se trata como `contactar` COMO MÍNIMO
+ *    (conservador y no clínico): mejor derivar de más que de menos.
+ *
+ * La creación de la `alerta` auditable para el profesional NO ocurre aquí (el
+ * loop es puro y escribe como el paciente, que por RLS no puede insertar
+ * alertas): se materializa al cierre en `evaluarCheckin` + `acciones`, que sí
+ * evalúa las reglas `senal` (leídas del audit) de forma idempotente.
  */
 
 import type { NivelRiesgo } from "@/types/db";
+import { TONO_MODELO_POR_NIVEL } from "./textos";
 
 /** Niveles que puede emitir el escalado (excluye `normal`). */
 export type NivelSenal = Exclude<NivelRiesgo, "normal">;
+
+/** Regla de tipo `senal` reducida a lo que necesita la clasificación en vivo. */
+export type ReglaSenal = {
+  codigo: string;
+  nivel: NivelSenal;
+  nombre: string;
+};
 
 export type EntradaSenal = {
   tipo: string;
   descripcion: string;
   evidenciaTextual: string;
-  /** Vertical del paciente; el motor de WP-04 lo usará para reglas por vertical. */
+  /** Vertical del paciente (para trazas; el filtrado por vertical se hace al cargar). */
   vertical?: string | null;
+  /**
+   * Reglas `senal` aplicables ya cargadas (opcional). Si no se pasan, la señal
+   * se clasifica de forma conservadora como `contactar`.
+   */
+  reglas?: readonly ReglaSenal[];
 };
 
 export type ResultadoSenal = {
   nivel: NivelSenal;
   motivo: string;
-  /** Instrucción para el modelo: tono calmado + sugerir contacto con el médico. */
+  /** Código normalizado de la señal (snake_case), útil para trazas/reglas. */
+  codigo: string;
+  /** Instrucción de tono para el modelo, adecuada al nivel resultante. */
   mensajeParaModelo: string;
 };
 
@@ -56,26 +77,40 @@ export function nivelMaximoRiesgo(
   return ORDEN_RIESGO[a] >= ORDEN_RIESGO[b] ? a : b;
 }
 
+/** Normaliza el `tipo`/código de una señal a snake_case ascii acotado. */
+export function normalizarCodigoSenal(valor: string): string {
+  const limpio = valor
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 120);
+  return limpio.length > 0 ? limpio : "senal_no_especificada";
+}
+
 /**
- * STUB de evaluación de una señal de alarma detectada en la conversación.
+ * Evalúa una señal de alarma detectada en la conversación.
  *
- * TODO WP-04: reemplazar por el motor de reglas configurables
- * (`reglas_escalado`), que además creará la `alerta` para el profesional con
- * la evidencia y podrá elevar el nivel a `urgencia` según vertical/combinación.
+ * Pura y síncrona: no toca la base de datos. Si se le pasan `reglas` de tipo
+ * `senal`, clasifica según ellas (pudiendo elevar a `urgencia`); si no, aplica
+ * el mínimo conservador `contactar`.
  */
 export function evaluarSenal(entrada: EntradaSenal): ResultadoSenal {
-  const tipo = entrada.tipo.trim().slice(0, 120) || "señal_no_especificada";
+  const codigo = normalizarCodigoSenal(entrada.tipo);
+
+  const reglaCoincidente = (entrada.reglas ?? []).find(
+    (r) => normalizarCodigoSenal(r.codigo) === codigo,
+  );
+
+  const nivel: NivelSenal = reglaCoincidente?.nivel ?? "contactar";
+  const motivo = reglaCoincidente
+    ? reglaCoincidente.nombre
+    : `Señal de aviso detectada durante el check-in: ${codigo}`;
 
   return {
-    nivel: "contactar",
-    motivo: `Señal de aviso detectada durante el check-in: ${tipo}`,
-    mensajeParaModelo:
-      "Se ha registrado una posible señal de aviso. Mantén un tono calmado, " +
-      "cercano y sin dramatizar. No diagnostiques ni interpretes la causa: " +
-      "reconoce lo que la persona te ha contado y sugiérele con amabilidad que " +
-      "contacte HOY con su médico o centro de salud. Si lo que describe parece " +
-      "una emergencia (por ejemplo dificultad grave para respirar o dolor " +
-      "intenso en el pecho), dile con serenidad que llame a los servicios de " +
-      "urgencias. Después, sigue el check-in solo si la persona está tranquila.",
+    nivel,
+    motivo,
+    codigo,
+    mensajeParaModelo: TONO_MODELO_POR_NIVEL[nivel],
   };
 }

@@ -12,6 +12,8 @@ import {
 import type { NivelRiesgo, VerticalPaciente } from "@/types/db";
 import { DOMINIOS_CHECKIN, type DominioCheckin } from "@/lib/ia/dominios";
 import { recomendacionDelDia } from "./recomendaciones";
+import PantallaUrgencia from "./PantallaUrgencia";
+import TarjetaContactar from "./TarjetaContactar";
 
 type RolMensajeUI = "asistente" | "paciente";
 type MensajeUI = { rol: RolMensajeUI; contenido: string };
@@ -34,6 +36,7 @@ type RespuestaMensaje = {
 type RespuestaFinalizar = {
   resumen: string;
   riesgo: NivelRiesgo | null;
+  telefono_medico: string | null;
   racha_actual: number;
   racha_maxima: number;
 };
@@ -190,7 +193,23 @@ export default function ChatCheckin({
   }
 
   if (fase === "cierre" && cierre) {
-    return <PantallaCierre cierre={cierre} vertical={vertical} />;
+    // Urgencia: pantalla dedicada, calmada pero inequívoca (RF-ES-03).
+    if (cierre.riesgo === "urgencia") {
+      return (
+        <PantallaUrgencia
+          checkinId={checkinId ?? ""}
+          telefonoMedico={cierre.telefono_medico}
+          resumen={cierre.resumen}
+        />
+      );
+    }
+    return (
+      <PantallaCierre
+        cierre={cierre}
+        vertical={vertical}
+        checkinId={checkinId ?? ""}
+      />
+    );
   }
 
   const setDominiosCubiertos = new Set(dominios);
@@ -378,9 +397,11 @@ function BannerRiesgo({ nivel }: { nivel: NivelRiesgo }) {
 function PantallaCierre({
   cierre,
   vertical,
+  checkinId,
 }: {
   cierre: RespuestaFinalizar;
   vertical: VerticalPaciente;
+  checkinId: string;
 }) {
   const recomendacion = recomendacionDelDia(vertical);
   return (
@@ -420,8 +441,11 @@ function PantallaCierre({
         <p className="text-base leading-relaxed text-texto">{cierre.resumen}</p>
       </section>
 
-      {(cierre.riesgo === "contactar" || cierre.riesgo === "urgencia") && (
-        <BannerRiesgo nivel={cierre.riesgo} />
+      {cierre.riesgo === "contactar" && (
+        <TarjetaContactar
+          checkinId={checkinId}
+          telefonoMedico={cierre.telefono_medico}
+        />
       )}
 
       <section

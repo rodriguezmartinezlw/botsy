@@ -15,7 +15,11 @@
  */
 
 import type { DominioObservacion, EstadoToma, NivelRiesgo } from "@/types/db";
-import { evaluarSenal, nivelMaximoRiesgo } from "@/lib/escalado/senales";
+import {
+  evaluarSenal,
+  nivelMaximoRiesgo,
+  type ReglaSenal,
+} from "@/lib/escalado/senales";
 import type { ClienteOpenAI, LlamadaHerramienta, MensajeLLM } from "./openai";
 import { toolsParaChat, type DominioCheckin } from "./conversacion";
 import {
@@ -64,6 +68,12 @@ export type OpcionesTurno = {
   contexto: {
     vertical?: string | null;
     dominiosYaCubiertos: DominioCheckin[];
+    /**
+     * Reglas `senal` aplicables (opcional). Si se pasan, `evaluarSenal`
+     * clasifica en vivo según ellas (p. ej. ideación autolítica → urgencia);
+     * si no, toda señal se trata de forma conservadora como `contactar`.
+     */
+    reglasSenal?: readonly ReglaSenal[];
   };
   maxIteraciones?: number;
 };
@@ -155,6 +165,7 @@ async function ejecutarHerramienta(
         descripcion: r.data.descripcion,
         evidenciaTextual: r.data.evidencia_textual,
         vertical: contexto.vertical ?? null,
+        reglas: contexto.reglasSenal,
       });
       await repositorio.registrarSenal({
         nivel: resultado.nivel,
