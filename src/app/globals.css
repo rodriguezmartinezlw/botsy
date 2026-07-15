@@ -85,3 +85,35 @@ body {
   outline: 3px solid var(--color-primario);
   outline-offset: 2px;
 }
+
+/* Confeti sobrio de la pantalla de cierre del check-in (WP-02) */
+.confeti-pieza {
+  position: absolute;
+  top: -12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confeti-caer 1.6s ease-in forwards;
+}
+
+@keyframes confeti-caer {
+  0% {
+    transform: translateY(-12px) rotate(0deg);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(128px) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confeti-pieza {
+    animation: none;
+    opacity: 0;
+  }
+}
