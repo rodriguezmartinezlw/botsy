@@ -64,6 +64,17 @@ botsy/
 
 Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 08.
 
+### Continuación post-F1 (índice completo en [PENDIENTE.md](PENDIENTE.md))
+
+| WP | Nombre | Depende de | Necesita claves |
+|---|---|---|---|
+| [WP-09](wp/WP-09-puesta-en-produccion.md) | Puesta en producción + E2E reales | F1 + insumos del usuario | Sí |
+| [WP-10](wp/WP-10-deuda-tecnica.md) | Deuda técnica consciente de F1 | F1 | No |
+| [WP-11](wp/WP-11-programas-nucleo.md) | **Programas de monitorización** ([ADR-002](adr/ADR-002-programas-de-monitorizacion.md)) | WP-10 ideal | No |
+| [WP-12](wp/WP-12-tareas-terapeuticas.md) | Tareas terapéuticas TCC + diario por voz | WP-11 | No |
+| [WP-13](wp/WP-13-programas-especificos-1.md) | Post-cirugía + psicooncología + fotos clínicas | WP-11 | No |
+| [WP-14](wp/WP-14-alzheimer-cuidador.md) | Modo Alzheimer voz-solo + cuidador v1 | WP-11 | No |
+
 ## 5. Protocolo director/implementador
 
 1. **Lanzamiento:** el director lanza un agente Opus por WP con el prompt: leer `CLAUDE.md`, `PLAN-MAESTRO.md`, su `docs/wp/WP-XX-*.md` y las secciones de la funcional referenciadas; implementar; verificar; escribir `docs/wp/entregas/WP-XX-entrega.md`. El implementador NO hace commit.
@@ -93,7 +104,16 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-07 | ✅ aprobado (commit) — ver `docs/revisiones/WP-07-revision.md` |
 | WP-08 | ✅ aprobado (commit) — ver `docs/revisiones/WP-08-revision.md` |
 
-**F1 COMPLETO (2026-07-15):** los 9 paquetes implementados, revisados y commiteados. 113 tests en verde, RLS sin defectos, sin fugas de secretos, guía de despliegue lista. Pendiente antes de pacientes reales (decisión del usuario, fuera de F1): crear proyecto Supabase + claves reales + E2E documentado, textos legales reales, diligencia RGPD/DPA.
+**F1 COMPLETO (2026-07-15):** los 9 paquetes implementados, revisados y commiteados. 113 tests en verde, RLS sin defectos, sin fugas de secretos, guía de despliegue lista.
+
+**Continuación (2026-07-16):** repo publicado en `github.com/rodriguezmartinezlw/botsy` (cuenta personal). Nueva dirección de producto: **programas de monitorización multi-perfil** (ADR-002 — psicología TCC, psiquiatría, psicooncología, Alzheimer, post-cirugía). Trabajo pendiente especificado en WP-09..WP-14; empezar por [PENDIENTE.md](PENDIENTE.md).
+
+| WP | Estado |
+|---|---|
+| WP-09 | ⏳ bloqueado por insumos del usuario (claves/cuentas) |
+| WP-10 | ⏳ pendiente — programable ya |
+| WP-11 | ⏳ pendiente — programable ya (leer ADR-002; 5 preguntas abiertas al usuario) |
+| WP-12…WP-14 | ⏳ pendientes — tras WP-11 |
 
 *(El director actualiza esta tabla en cada commit.)*
 

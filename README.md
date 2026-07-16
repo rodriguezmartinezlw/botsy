@@ -74,4 +74,4 @@ despliegue a producción (Supabase + Vercel) está en **[docs/DESPLIEGUE.md](doc
 
 ## Estado
 
-Fase F1 (MVP conversacional) en construcción. Ver progreso en `docs/PLAN-MAESTRO.md` §7.
+**F1 (MVP conversacional) completo** — 113 tests en verde, RLS auditada, guía de despliegue en `docs/DESPLIEGUE.md`. La continuación (puesta en producción, deuda técnica y **programas de monitorización multi-perfil** — psicología TCC, psiquiatría, psicooncología, Alzheimer, post-cirugía) está especificada en **[docs/PENDIENTE.md](docs/PENDIENTE.md)** (empezar ahí) y en `docs/wp/WP-09..WP-14`. Decisión de arquitectura multi-perfil: [docs/adr/ADR-002](docs/adr/ADR-002-programas-de-monitorizacion.md).
