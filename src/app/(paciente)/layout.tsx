@@ -22,7 +22,16 @@ export default async function PacienteLayout({
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col bg-superficie shadow-sm">
-      <main className="flex-1 px-5 pb-28 pt-8">{children}</main>
+      {/* Salto al contenido para navegación por teclado (perfil geriátrico). */}
+      <a
+        href="#contenido-paciente"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[var(--radius-md)] focus:bg-primario focus:px-4 focus:py-2 focus:text-base focus:font-semibold focus:text-white"
+      >
+        Saltar al contenido
+      </a>
+      <main id="contenido-paciente" className="flex-1 px-5 pb-28 pt-8">
+        {children}
+      </main>
       <NavInferior />
     </div>
   );

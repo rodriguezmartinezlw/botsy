@@ -35,6 +35,43 @@ Este proyecto se construye con un flujo **director / implementador**:
 
 Next.js 16 (App Router, TypeScript estricto, Tailwind) · Supabase (Postgres + Auth + Storage, RLS) · OpenAI (Realtime API para voz, modelo de texto para extracción) · Recharts · Vercel.
 
+## Desarrollo local
+
+Requisitos: Node.js 20+ y `npm`. Para probar los flujos completos, un proyecto
+Supabase y claves de OpenAI/Resend (la app **compila y arranca sin ellas**; las
+peticiones que las necesiten fallan de forma controlada con un mensaje claro).
+
+```bash
+# 1. Instalar dependencias
+npm install
+
+# 2. Variables de entorno: copia la plantilla y rellena los valores reales
+cp .env.example .env.local        # y edita .env.local (nunca lo subas al repo)
+
+# 3. Arrancar en desarrollo (http://localhost:3000)
+npm run dev
+```
+
+Comandos:
+
+| Comando | Qué hace |
+|---|---|
+| `npm run dev` | Servidor de desarrollo con recarga en caliente |
+| `npm run build` | Build de producción (comprueba también TypeScript) |
+| `npm run start` | Sirve el build de producción |
+| `npm run lint` | ESLint (config de Next) |
+| `npm test` | Tests unitarios/lógicos con Vitest |
+
+**Base de datos local (opcional).** Con la [Supabase CLI](https://supabase.com/docs/guides/cli):
+`supabase start` levanta el stack local y `supabase db reset` aplica las
+migraciones de `supabase/migrations/` + el seed de demo (`supabase/seed.sql`,
+usuarios con contraseña `Botsy1234!`). El segundo profesional se añade con
+`psql "$DATABASE_URL" -f supabase/seed_wp06_segundo_profesional.sql`. Para
+verificar el aislamiento por RLS: `psql "$DATABASE_URL" -f supabase/tests/acceso_cruzado.sql`.
+
+Todas las variables de entorno usadas están documentadas en `.env.example`. El
+despliegue a producción (Supabase + Vercel) está en **[docs/DESPLIEGUE.md](docs/DESPLIEGUE.md)**.
+
 ## Estado
 
 Fase F1 (MVP conversacional) en construcción. Ver progreso en `docs/PLAN-MAESTRO.md` §7.

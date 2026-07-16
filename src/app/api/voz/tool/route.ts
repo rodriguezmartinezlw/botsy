@@ -21,6 +21,7 @@ import { parsearDominiosCubiertos } from "@/lib/ia/conversacion";
 import { cargarReglasSenal, evaluarCheckin } from "@/lib/escalado/motor";
 import {
   aplicarEscalado,
+  aplicarEscaladoSenalGenerica,
   crearRepositorioAccionesServicio,
 } from "@/lib/escalado/acciones";
 
@@ -89,12 +90,15 @@ export async function POST(request: Request): Promise<Response> {
         // Best-effort: nunca tumba la respuesta al modelo (igual que /mensaje).
         try {
           const evaluacion = await evaluarCheckin(id);
+          const repoAcciones = await crearRepositorioAccionesServicio();
           if (
             evaluacion.nivel !== "normal" &&
             evaluacion.reglasDisparadas.length > 0
           ) {
-            const repoAcciones = await crearRepositorioAccionesServicio();
             await aplicarEscalado(evaluacion, repoAcciones);
+          } else {
+            // Señal genérica sin regla asociada (WP-08, punto b).
+            await aplicarEscaladoSenalGenerica(evaluacion, repoAcciones);
           }
         } catch {
           // El escalado no debe impedir devolver el resultado de la tool.

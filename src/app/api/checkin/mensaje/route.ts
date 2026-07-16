@@ -23,6 +23,7 @@ import { crearRepositorioSupabase } from "@/lib/ia/repositorio-supabase";
 import { cargarReglasSenal, evaluarCheckin } from "@/lib/escalado/motor";
 import {
   aplicarEscalado,
+  aplicarEscaladoSenalGenerica,
   crearRepositorioAccionesServicio,
 } from "@/lib/escalado/acciones";
 import { esquemaCuerpoMensaje } from "@/lib/ia/schemas";
@@ -155,12 +156,16 @@ export async function POST(request: Request): Promise<Response> {
     if (riesgoTurno === "contactar" || riesgoTurno === "urgencia") {
       try {
         const evaluacion = await evaluarCheckin(checkinId);
+        const repoAcciones = await crearRepositorioAccionesServicio();
         if (
           evaluacion.nivel !== "normal" &&
           evaluacion.reglasDisparadas.length > 0
         ) {
-          const repoAcciones = await crearRepositorioAccionesServicio();
           await aplicarEscalado(evaluacion, repoAcciones);
+        } else {
+          // Señal genérica sin regla asociada: el profesional debe enterarse
+          // igual (WP-08, punto b). Idempotente y best-effort.
+          await aplicarEscaladoSenalGenerica(evaluacion, repoAcciones);
         }
       } catch {
         // El escalado no debe impedir responder al paciente.

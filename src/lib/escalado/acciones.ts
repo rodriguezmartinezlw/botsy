@@ -43,6 +43,12 @@ export type EventoEscalado = {
 export interface RepositorioAcciones {
   /** ¿Existe ya una alerta para esta regla en este check-in? (idempotencia) */
   alertaExiste(checkinId: string, reglaId: string): Promise<boolean>;
+  /**
+   * ¿Existe ya una alerta SIN regla (`regla_id` null) para este check-in?
+   * Idempotencia de la materialización de señales genéricas (WP-08, punto b):
+   * una única alerta genérica por check-in, aunque se re-evalúe en cada turno.
+   */
+  alertaSinReglaExiste(checkinId: string): Promise<boolean>;
   crearAlerta(alerta: AlertaNueva): Promise<void>;
   actualizarRiesgo(checkinId: string, nivel: NivelRiesgo): Promise<void>;
   registrarAuditoria(evento: EventoEscalado): Promise<void>;
@@ -147,6 +153,80 @@ export async function aplicarEscalado(
   return { alertasCreadas, nivel: evaluacion.nivel, riesgoFinal };
 }
 
+/**
+ * Materializa una alerta para el profesional cuando el riesgo del check-in llegó
+ * en vivo a `contactar`/`urgencia` por una SEÑAL GENÉRICA que NO casa con ninguna
+ * regla configurada (WP-08, punto b). Sin esto, el paciente vería la pantalla de
+ * contacto/urgencia pero el profesional NO recibiría ninguna alerta (hueco
+ * anotado por la revisión de WP-04).
+ *
+ * Coherente con la materialización inmediata de `aplicarEscalado`:
+ *  - Solo actúa si NINGUNA regla disparó (esas las gestiona `aplicarEscalado`).
+ *  - IDEMPOTENTE: una sola alerta genérica por check-in (`alertaSinReglaExiste`),
+ *    así que re-evaluar en cada turno / al cierre no la duplica.
+ *  - El riesgo del check-in ya lo subió el turno en vivo (`registrarSenal`); aquí
+ *    no se re-escribe, solo se crea la alerta y su traza de auditoría.
+ *
+ * `regla_id` queda null (no hay regla); el motivo lo deja explícito para el panel.
+ */
+export async function aplicarEscaladoSenalGenerica(
+  evaluacion: EvaluacionCheckin,
+  repo: RepositorioAcciones,
+): Promise<ResultadoAcciones> {
+  const nivel = evaluacion.riesgoActual;
+
+  // Solo señales genéricas que elevaron el riesgo a contactar/urgencia y que
+  // ninguna regla cubre. En cualquier otro caso, no hay nada que materializar.
+  if (
+    evaluacion.reglasDisparadas.length > 0 ||
+    (nivel !== "contactar" && nivel !== "urgencia")
+  ) {
+    return { alertasCreadas: 0, nivel: nivel ?? "normal", riesgoFinal: nivel };
+  }
+
+  // Idempotencia: una única alerta genérica por check-in.
+  if (await repo.alertaSinReglaExiste(evaluacion.checkinId)) {
+    return { alertasCreadas: 0, nivel, riesgoFinal: nivel };
+  }
+
+  const evidencia: Json = {
+    detalle: [
+      "Señal de alarma detectada durante el check-in que no coincide con ninguna regla configurada.",
+    ],
+    // Forma uniforme con `aplicarEscalado` (una señal genérica no lleva
+    // observaciones; el panel es defensivo, pero mantenemos la clave presente).
+    observaciones: [],
+    senales: evaluacion.senalesDetectadas,
+    mensajes: evaluacion.mensajesRelevantes.map((m) => ({
+      rol: m.rol,
+      contenido: m.contenido,
+    })),
+  };
+
+  await repo.crearAlerta({
+    pacienteId: evaluacion.pacienteId,
+    checkinId: evaluacion.checkinId,
+    reglaId: null,
+    nivel,
+    motivo: "Señal de alarma sin regla configurada",
+    evidencia,
+  });
+
+  await repo.registrarAuditoria({
+    pacienteId: evaluacion.pacienteId,
+    checkinId: evaluacion.checkinId,
+    detalle: {
+      nivel,
+      recomendacion: recomendacionInterna(nivel),
+      tipo: "senal_generica",
+      senales: evaluacion.senalesDetectadas,
+      alertas_creadas: 1,
+    },
+  });
+
+  return { alertasCreadas: 1, nivel, riesgoFinal: nivel };
+}
+
 // --- Implementación Supabase (service-role) ---------------------------------
 
 /** Crea el repositorio de acciones respaldado por un cliente Supabase de servicio. */
@@ -158,6 +238,17 @@ export function crearRepositorioAcciones(supabase: ClienteBD): RepositorioAccion
         .select("id")
         .eq("checkin_id", checkinId)
         .eq("regla_id", reglaId)
+        .limit(1)
+        .maybeSingle();
+      return data !== null;
+    },
+
+    async alertaSinReglaExiste(checkinId) {
+      const { data } = await supabase
+        .from("alertas")
+        .select("id")
+        .eq("checkin_id", checkinId)
+        .is("regla_id", null)
         .limit(1)
         .maybeSingle();
       return data !== null;

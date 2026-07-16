@@ -422,6 +422,13 @@ export type EvaluacionCheckin = {
   reglasDisparadas: ReglaDisparada[];
   /** Últimos mensajes del check-in, para la evidencia de la alerta. */
   mensajesRelevantes: { rol: string; contenido: string }[];
+  /**
+   * Códigos de las señales de alarma detectadas en vivo en este check-in
+   * (`senal_alarma` en la auditoría). Se usan para materializar la alerta de una
+   * señal GENÉRICA (sin regla asociada) cuando el riesgo en vivo llegó a
+   * `contactar`/`urgencia` pero ninguna regla la cubre (WP-08, punto b).
+   */
+  senalesDetectadas: string[];
 };
 
 const RESULTADO_VACIO = (checkinId: string): EvaluacionCheckin => ({
@@ -431,6 +438,7 @@ const RESULTADO_VACIO = (checkinId: string): EvaluacionCheckin => ({
   nivel: "normal",
   reglasDisparadas: [],
   mensajesRelevantes: [],
+  senalesDetectadas: [],
 });
 
 async function clienteMotor(inyectado?: ClienteBD): Promise<ClienteBD> {
@@ -669,5 +677,6 @@ export async function evaluarCheckin(
     nivel,
     reglasDisparadas,
     mensajesRelevantes,
+    senalesDetectadas: datos.senales,
   };
 }

@@ -43,6 +43,16 @@ type RespuestaFinalizar = {
 
 type Fase = "cargando" | "listo" | "cierre" | "no_disponible";
 
+/**
+ * Sesión expirada (401): manda al login CONSERVANDO el destino para volver
+ * aquí tras reautenticarse (WP-08, robustez).
+ */
+function redirigirALogin(): void {
+  if (typeof window === "undefined") return;
+  const destino = window.location.pathname + window.location.search;
+  window.location.href = `/login?next=${encodeURIComponent(destino)}`;
+}
+
 const PIEZAS_CONFETI = [
   "var(--color-primario)",
   "var(--color-acento)",
@@ -77,6 +87,10 @@ export default function ChatCheckin({
       try {
         const res = await fetch("/api/checkin/iniciar", { method: "POST" });
         if (!res.ok) {
+          if (res.status === 401) {
+            redirigirALogin();
+            return;
+          }
           if (!cancelado) setFase("no_disponible");
           return;
         }
@@ -116,6 +130,10 @@ export default function ChatCheckin({
         body: JSON.stringify({ checkinId, texto }),
       });
       if (!res.ok) {
+        if (res.status === 401) {
+          redirigirALogin();
+          return;
+        }
         // El servidor no persistió nada: revertir la burbuja optimista.
         setMensajes((prev) => prev.slice(0, -1));
         setEntrada(texto);
@@ -150,6 +168,10 @@ export default function ChatCheckin({
         body: JSON.stringify({ checkinId }),
       });
       if (!res.ok) {
+        if (res.status === 401) {
+          redirigirALogin();
+          return;
+        }
         setError("No se pudo finalizar el check-in. Inténtalo de nuevo.");
         return;
       }

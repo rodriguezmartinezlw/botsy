@@ -21,6 +21,7 @@ import {
 } from "./motor";
 import {
   aplicarEscalado,
+  aplicarEscaladoSenalGenerica,
   type AlertaNueva,
   type EventoEscalado,
   type RepositorioAcciones,
@@ -250,6 +251,11 @@ function repoAccionesMemoria() {
         (a) => a.checkinId === checkinId && a.reglaId === reglaId,
       );
     },
+    async alertaSinReglaExiste(checkinId) {
+      return alertas.some(
+        (a) => a.checkinId === checkinId && a.reglaId === null,
+      );
+    },
     async crearAlerta(a) {
       alertas.push(a);
     },
@@ -283,6 +289,7 @@ function evaluacionToracicoDisnea(): EvaluacionCheckin {
       { rol: "asistente", contenido: "¿Cómo te encuentras hoy?" },
       { rol: "paciente", contenido: "me duele el pecho y me falta el aire" },
     ],
+    senalesDetectadas: [],
   };
 }
 
@@ -339,12 +346,84 @@ describe("aplicarEscalado — E2E dolor torácico + disnea → urgencia", () => 
         nivel,
         reglasDisparadas,
         mensajesRelevantes: [],
+        senalesDetectadas: [],
       },
       m.repo,
     );
     expect(res.alertasCreadas).toBe(0);
     expect(m.alertas).toHaveLength(0);
     expect(m.audits).toHaveLength(0);
+  });
+});
+
+// --- Señales genéricas SIN regla: materialización de alerta (WP-08, punto b) --
+
+/** Check-in cuyo riesgo se elevó en vivo por una señal que NINGUNA regla cubre. */
+function evaluacionSenalGenerica(
+  riesgoActual: NivelRiesgo | null,
+): EvaluacionCheckin {
+  return {
+    checkinId: "chk-gen",
+    pacienteId: "pac-9",
+    riesgoActual,
+    nivel: "normal", // ninguna regla disparó
+    reglasDisparadas: [],
+    mensajesRelevantes: [
+      { rol: "paciente", contenido: "me noto raro y con mareos fuertes" },
+    ],
+    senalesDetectadas: ["mareo_intenso"],
+  };
+}
+
+describe("aplicarEscaladoSenalGenerica — señal sin regla configurada", () => {
+  it("crea UNA alerta sin regla (regla_id null) cuando el riesgo llegó a contactar", async () => {
+    const m = repoAccionesMemoria();
+    const res = await aplicarEscaladoSenalGenerica(
+      evaluacionSenalGenerica("contactar"),
+      m.repo,
+    );
+    expect(res.alertasCreadas).toBe(1);
+    expect(m.alertas).toHaveLength(1);
+    expect(m.alertas[0].reglaId).toBeNull();
+    expect(m.alertas[0].nivel).toBe("contactar");
+    expect(m.alertas[0].motivo).toBe("Señal de alarma sin regla configurada");
+    // La evidencia incluye la señal detectada y el mensaje del paciente.
+    const evidenciaStr = JSON.stringify(m.alertas[0].evidencia);
+    expect(evidenciaStr).toContain("mareo_intenso");
+    expect(evidenciaStr).toContain("mareos fuertes");
+    // Un evento de auditoría del escalado genérico.
+    expect(m.audits).toHaveLength(1);
+    expect(JSON.stringify(m.audits[0].detalle)).toContain("senal_generica");
+  });
+
+  it("es idempotente: no crea una segunda alerta genérica en el mismo check-in", async () => {
+    const m = repoAccionesMemoria();
+    await aplicarEscaladoSenalGenerica(evaluacionSenalGenerica("contactar"), m.repo);
+    const r2 = await aplicarEscaladoSenalGenerica(
+      evaluacionSenalGenerica("urgencia"),
+      m.repo,
+    );
+    expect(r2.alertasCreadas).toBe(0);
+    expect(m.alertas).toHaveLength(1);
+    expect(m.audits).toHaveLength(1);
+  });
+
+  it("NO actúa si alguna regla ya disparó (esas las gestiona aplicarEscalado)", async () => {
+    const m = repoAccionesMemoria();
+    const evaluacion = evaluacionToracicoDisnea(); // reglasDisparadas.length > 0
+    const res = await aplicarEscaladoSenalGenerica(evaluacion, m.repo);
+    expect(res.alertasCreadas).toBe(0);
+    expect(m.alertas).toHaveLength(0);
+  });
+
+  it("NO actúa si el riesgo no llegó a contactar/urgencia", async () => {
+    const m = repoAccionesMemoria();
+    const res = await aplicarEscaladoSenalGenerica(
+      evaluacionSenalGenerica("vigilancia"),
+      m.repo,
+    );
+    expect(res.alertasCreadas).toBe(0);
+    expect(m.alertas).toHaveLength(0);
   });
 });
 

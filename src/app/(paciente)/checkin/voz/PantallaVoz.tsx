@@ -73,6 +73,13 @@ const PIEZAS_CONFETI = [
   "var(--color-vigilancia)",
 ];
 
+/** Sesión expirada (401): al login conservando el destino (WP-08, robustez). */
+function redirigirALogin(): void {
+  if (typeof window === "undefined") return;
+  const destino = window.location.pathname + window.location.search;
+  window.location.href = `/login?next=${encodeURIComponent(destino)}`;
+}
+
 function elegirMimeGrabacion(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidatos = ["audio/webm;codecs=opus", "audio/webm", "audio/ogg"];
@@ -218,6 +225,10 @@ export default function PantallaVoz({
     try {
       const res = await fetch("/api/voz/sesion", { method: "POST" });
       if (!res.ok) {
+        if (res.status === 401) {
+          redirigirALogin();
+          return;
+        }
         if (res.status === 403) {
           setError(
             "Necesitas aceptar el registro de conversaciones para usar el modo voz.",
@@ -424,6 +435,10 @@ export default function PantallaVoz({
         body: JSON.stringify(audioPath ? { checkinId, audioPath } : { checkinId }),
       });
       if (!res.ok) {
+        if (res.status === 401) {
+          redirigirALogin();
+          return;
+        }
         setError(
           "Tu conversación se guardó, pero no pude generar el resumen. Puedes verlo desde el inicio.",
         );

@@ -323,6 +323,11 @@ export default function InformeVista({
         <p className="font-medium">
           Documento de seguimiento generado por Botsy. No constituye diagnóstico.
         </p>
+        <p>
+          [PENDIENTE LEGAL] Documento de apoyo al seguimiento clínico; no
+          sustituye el juicio profesional. Contiene datos de salud: trátese de
+          forma confidencial conforme al RGPD.
+        </p>
         <p>Generado el {fechaLarga(fechaGeneracion.slice(0, 10))}.</p>
       </footer>
     </article>

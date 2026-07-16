@@ -7,10 +7,15 @@ import { rutaPorRol } from "@/lib/auth/roles";
 
 /**
  * Formulario de inicio de sesión conectado a Supabase Auth (email+contraseña).
- * Tras autenticar, redirige según el rol del perfil (paciente -> /inicio,
- * profesional/admin -> /pacientes).
+ * Tras autenticar, redirige al `destino` (si se pasó uno seguro, p. ej. al
+ * volver de una sesión expirada conservando la ruta), o según el rol del perfil
+ * (paciente -> /inicio, profesional/admin -> /pacientes).
  */
-export default function FormularioLogin() {
+export default function FormularioLogin({
+  destino,
+}: {
+  destino?: string | null;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -45,7 +50,7 @@ export default function FormularioLogin() {
         rol = perfil?.rol ?? null;
       }
 
-      router.replace(rutaPorRol(rol));
+      router.replace(destino ?? rutaPorRol(rol));
       router.refresh();
     } catch {
       setError(

@@ -13,10 +13,16 @@ export const metadata: Metadata = {
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ rol?: string }>;
+  searchParams: Promise<{ rol?: string; next?: string }>;
 }) {
-  const { rol } = await searchParams;
+  const { rol, next } = await searchParams;
   const esProfesional = rol === "profesional";
+  // Destino tras autenticar (sesión expirada): solo rutas relativas seguras
+  // (evita open-redirect). Si no es válido, se usa la ruta por rol.
+  const destino =
+    typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
+      ? next
+      : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -31,7 +37,7 @@ export default async function LoginPage({
         </p>
       </div>
 
-      <FormularioLogin />
+      <FormularioLogin destino={destino} />
 
       <p className="text-center text-base text-texto-suave">
         ¿No tienes cuenta?{" "}

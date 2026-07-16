@@ -25,6 +25,7 @@ import { reconciliar } from "./extraccion";
 import { evaluarCheckin } from "@/lib/escalado/motor";
 import {
   aplicarEscalado,
+  aplicarEscaladoSenalGenerica,
   crearRepositorioAccionesServicio,
 } from "@/lib/escalado/acciones";
 
@@ -116,9 +117,14 @@ export async function finalizarCheckin(
   let riesgoFinal: NivelRiesgo | null = checkin.riesgo;
   try {
     const evaluacion = await evaluarCheckin(checkinId);
+    const repoAcciones = await crearRepositorioAccionesServicio();
     if (evaluacion.nivel !== "normal" && evaluacion.reglasDisparadas.length > 0) {
-      const repoAcciones = await crearRepositorioAccionesServicio();
       const res = await aplicarEscalado(evaluacion, repoAcciones);
+      riesgoFinal = res.riesgoFinal ?? riesgoFinal;
+    } else {
+      // Señal genérica sin regla asociada elevada en vivo (WP-08, punto b): al
+      // cierre también se materializa la alerta al profesional, idempotente.
+      const res = await aplicarEscaladoSenalGenerica(evaluacion, repoAcciones);
       riesgoFinal = res.riesgoFinal ?? riesgoFinal;
     }
   } catch {

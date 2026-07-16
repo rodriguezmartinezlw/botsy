@@ -91,7 +91,9 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-05 | ✅ aprobado (commit) — ver `docs/revisiones/WP-05-revision.md` |
 | WP-06 | ✅ aprobado (commit) — ver `docs/revisiones/WP-06-revision.md` |
 | WP-07 | ✅ aprobado (commit) — ver `docs/revisiones/WP-07-revision.md` |
-| WP-08 | ▶️ último (hardening) |
+| WP-08 | ✅ aprobado (commit) — ver `docs/revisiones/WP-08-revision.md` |
+
+**F1 COMPLETO (2026-07-15):** los 9 paquetes implementados, revisados y commiteados. 113 tests en verde, RLS sin defectos, sin fugas de secretos, guía de despliegue lista. Pendiente antes de pacientes reales (decisión del usuario, fuera de F1): crear proyecto Supabase + claves reales + E2E documentado, textos legales reales, diligencia RGPD/DPA.
 
 *(El director actualiza esta tabla en cada commit.)*
 
