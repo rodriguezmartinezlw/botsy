@@ -74,4 +74,4 @@ despliegue a producción (Supabase + Vercel) está en **[docs/DESPLIEGUE.md](doc
 
 ## Estado
 
-**F1 (MVP conversacional) completo** — 113 tests en verde, RLS auditada, guía de despliegue en `docs/DESPLIEGUE.md`. La continuación (puesta en producción, deuda técnica y **programas de monitorización multi-perfil** — psicología TCC, psiquiatría, psicooncología, Alzheimer, post-cirugía) está especificada en **[docs/PENDIENTE.md](docs/PENDIENTE.md)** (empezar ahí) y en `docs/wp/WP-09..WP-14`. Decisión de arquitectura multi-perfil: [docs/adr/ADR-002](docs/adr/ADR-002-programas-de-monitorizacion.md).
+**F1 (plataforma conversacional) completa** — 113 tests en verde, RLS auditada, guía de despliegue en `docs/DESPLIEGUE.md`. **El producto pivotó a oncología** (julio 2026): cáncer de mama (programas «Terapia oral» y «Tratamiento activo») + oncología pediátrica vía cuidador-proxy, con pagador farma (PSP) y capitados — ver **[docs/MEMORIA-PROYECTO.md](docs/MEMORIA-PROYECTO.md)** (autoridad de producto) y **[docs/PLAN-TECNICO-PILOTO.md](docs/PLAN-TECNICO-PILOTO.md)** (hoja de ruta técnica). Para continuar el trabajo: **[docs/PENDIENTE.md](docs/PENDIENTE.md)**.

@@ -106,14 +106,17 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 
 **F1 COMPLETO (2026-07-15):** los 9 paquetes implementados, revisados y commiteados. 113 tests en verde, RLS sin defectos, sin fugas de secretos, guía de despliegue lista.
 
-**Continuación (2026-07-16):** repo publicado en `github.com/rodriguezmartinezlw/botsy` (cuenta personal). Nueva dirección de producto: **programas de monitorización multi-perfil** (ADR-002 — psicología TCC, psiquiatría, psicooncología, Alzheimer, post-cirugía). Trabajo pendiente especificado en WP-09..WP-14; empezar por [PENDIENTE.md](PENDIENTE.md).
+**Continuación (2026-07-16):** repo publicado en `github.com/rodriguezmartinezlw/botsy` (cuenta personal). **PIVOTE DE PRODUCTO A ONCOLOGÍA** ([MEMORIA-PROYECTO.md](MEMORIA-PROYECTO.md) + [ADR-003](adr/ADR-003-pivote-oncologia.md)): cáncer de mama (2 programas) + pediatría cuidador-proxy; pagador farma/PSP y capitados; NO B2C. La hoja de ruta técnica vigente es **[PLAN-TECNICO-PILOTO.md](PLAN-TECNICO-PILOTO.md)**; empezar por [PENDIENTE.md](PENDIENTE.md).
 
 | WP | Estado |
 |---|---|
-| WP-09 | ⏳ bloqueado por insumos del usuario (claves/cuentas) |
-| WP-10 | ⏳ pendiente — programable ya |
-| WP-11 | ⏳ pendiente — programable ya (leer ADR-002; decisiones de producto ya confirmadas) |
-| WP-12…WP-14 | ⏳ pendientes — tras WP-11 |
+| WP-10 (deuda técnica) | ⏳ pendiente — programable YA, sin puerta |
+| WP-11 v2 (programas oncología + disposición estructurada) | ⏳ pendiente — arquitectura sin puerta; umbrales ← llamada 1 |
+| WP-16 (termómetro NCCN) · WP-17 (dashboard patrocinador + demo) · WP-15 (ROI) | ⏳ specs en PLAN-TECNICO §5; fin sprint 2 = demo vendible |
+| WP-18 (farmacovigilancia) | ⏳ puerta: primera LOI farma |
+| WP-19 (cuidador-proxy pediátrico) | ⏳ puerta: asociación/fundación |
+| WP-09 (producción + E2E) | ⏳ puerta: claves del fundador (no bloquea la venta) |
+| WP-12 · WP-13 · WP-14 | ⛔ APARCADOS (MEMORIA §8.2; el §3 de WP-13 absorbido por WP-11 v2) |
 
 *(El director actualiza esta tabla en cada commit.)*
 

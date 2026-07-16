@@ -1,5 +1,7 @@
 # WP-12 — Tareas terapéuticas (TCC) + diario por voz
 
+> ⛔ **APARCADO (2026-07-16, ADR-003 / MEMORIA-PROYECTO §8.2).** No implementar: el foco es la fase piloto oncológica (PLAN-TECNICO-PILOTO.md). Este WP se despierta solo si su puerta comercial/clínica se abre. El diseño sigue siendo válido como referencia.
+
 **Depende de:** WP-11 (módulos `tareas` y `diario` del programa) · **Perfil objetivo:** psicología TCC y psiquiatría (ADR-002) · **Regla de oro reforzada:** Botsy acompaña la tarea prescrita por el terapeuta; JAMÁS hace terapia por su cuenta ni interpreta clínicamente.
 
 ## Objetivo

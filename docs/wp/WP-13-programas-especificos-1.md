@@ -1,5 +1,7 @@
 # WP-13 — Programas específicos I: post-cirugía y psicooncología (+ fotos clínicas)
 
+> ⛔ **APARCADO (2026-07-16, ADR-003 / MEMORIA-PROYECTO §8.2)** — salvo su **§3 (reglas oncológicas y rango de fiebre)**, que queda ABSORBIDO por WP-11 v2 §C. Post-cirugía se despierta solo por el carril Boston Scientific (año 2); fotos clínicas, con su programa.
+
 **Depende de:** WP-11 · **Funcional:** RF-VD-04 (versión simple, sin análisis automático), ADR-002 (plantillas postcirugia y psicooncologia) · **Los umbrales clínicos de este WP son borrador: irán a validación clínica antes de pacientes reales.**
 
 ## Tareas

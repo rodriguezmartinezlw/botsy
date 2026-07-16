@@ -18,9 +18,14 @@ Botsy es un asistente sanitario: app del paciente (check-in diario por voz/texto
 ## Reglas clínicas (innegociables)
 
 - Botsy **nunca diagnostica** ante el paciente. Detecta señales, informa con lenguaje empático no alarmista y deriva al profesional.
+- **La IA no conversa con menores.** En pediatría el interlocutor es SIEMPRE el cuidador adulto titular (modo proxy, 3ª persona); el gate se verifica server-side y por test. Ningún guion, texto o flujo puede dirigirse a un menor.
+- **Toda alerta se resuelve con disposición estructurada obligatoria** (decisión + motivo codificado + desenlace programado). Resolver o descartar sin disposición debe ser imposible por diseño.
+- **v1 no predice ni sugiere.** El escalado es determinista por reglas configuradas por humanos; el LLM captura, estructura y pre-señala — nunca decide ni recomienda terapia. Prohibido introducir scoring predictivo o sugerencias clínicas generadas por IA.
 - Toda pantalla o mensaje con contenido de salud dirigido al paciente incluye tono calmado; las urgencias dan instrucciones claras sin dramatizar.
 - Ninguna recomendación al paciente puede contradecir la pauta del profesional.
-- Los textos visibles siempre distinguen "señal detectada" de "diagnóstico".
+- Los textos visibles siempre distinguen "señal detectada" de "diagnóstico"; ningún texto de UI describe predicción, diagnóstico ni triaje autónomo (intended purpose regulatorio).
+- Los umbrales clínicos (reglas, instrumentos) se implementan CONFIGURABLES y marcados `[PENDIENTE CLÍNICO]` hasta su validación por el clínico del proyecto.
+- El rol `patrocinador` (farma) solo accede a agregados pseudonimizados con k-anonimato ≥5; jamás a datos identificables de pacientes.
 
 ## Reglas técnicas
 

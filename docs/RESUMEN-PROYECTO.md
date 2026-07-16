@@ -11,19 +11,15 @@
 
 **Regla de oro innegociable:** Botsy NUNCA diagnostica ante el paciente. Detecta señales, las comunica con calma ("he notado algo que conviene comentar con tu médico") y deriva al profesional. El diagnóstico es siempre humano. Toda la base de código respeta esto y las revisiones lo verifican.
 
-**Modelo de negocio:** suscripción ~$29/mes (B2C/B2B: aseguradoras, clínicas). Por eso el coste por usuario importa: la voz usa OpenAI Realtime `gpt-realtime-2.1-mini` vía WebRTC (~$3–7.5/usuario/mes a 150 min; análisis completo en `docs/adr/ADR-001-api-de-voz.md`), detrás de una abstracción `VoiceSession` que permite migrar de proveedor.
+**Modelo de negocio (pivote 2026-07-16 — [MEMORIA-PROYECTO.md](MEMORIA-PROYECTO.md) es la autoridad de producto):** se vende a **laboratorios farmacéuticos** vía Programas de Soporte al Paciente (pilotos $60–200K) y a **pagadores capitados** en el año 2. **NO es B2C; el paciente no paga.** A esos precios el coste de voz (OpenAI Realtime mini vía WebRTC, ~$3–7.5/usuario/mes, `docs/adr/ADR-001-api-de-voz.md`) es marginal; la abstracción `VoiceSession` permite migrar de proveedor.
 
 ## La dirección de producto actual (lo más importante que debes entender)
 
-**Programas de monitorización** (`docs/adr/ADR-002-programas-de-monitorizacion.md`): el mismo producto sirve a perfiles clínicos muy distintos porque el profesional asigna a cada paciente un **programa** = prescripción empaquetada de módulos activos (voz/texto/tareas/diario/fotos), guion del check-in, reglas de escalado, frecuencia y ciclo de vida. Cinco plantillas iniciales:
+**Oncología primero** (`docs/adr/ADR-003-pivote-oncologia.md` + `docs/MEMORIA-PROYECTO.md`): vertical de entrada **cáncer de mama** con 2 programas — «Terapia oral» (adherencia diaria + fiebre/diarrea/fatiga) y «Tratamiento activo» (síntomas de ciclo + distrés) — y **oncología pediátrica vía cuidador-proxy**: la IA JAMÁS conversa con menores; el padre/madre (titular de la cuenta) reporta por voz sobre su hijo. La arquitectura de programas de ADR-002 sigue vigente; sus plantillas multi-perfil (TCC, psiquiatría, Alzheimer, post-cirugía) quedaron ⛔ APARCADAS (MEMORIA §8.2).
 
-- **Psicología TCC** — tareas terapéuticas prescritas + "cuaderno hablado": el paciente registra pensamientos por voz (situación→pensamiento→emoción→alternativa) y el terapeuta los ve estructurados.
-- **Psiquiatría** — adherencia crítica, señales de recaída.
-- **Psicooncología** — síntomas del tratamiento; fiebre ≥38 en tratamiento activo = urgencia.
-- **Alzheimer** — SOLO voz, UI de un botón, ritmo lento, cuidador v1 (sin cuenta, recibe avisos por email).
-- **Post-cirugía** — programa temporal por fases con alta automática + foto dirigida de la herida.
+**Las 4 reglas de oro** (en CLAUDE.md, vinculantes): (1) nunca diagnostica; (2) la IA no conversa con menores; (3) **toda alerta se resuelve con disposición estructurada obligatoria** (decisión + motivo codificado + desenlace a X días — la semilla del activo de datos, no retrofiteable); (4) **v1 no predice ni sugiere** (escalado determinista; el LLM captura y estructura, nunca decide).
 
-Las 5 decisiones de producto están **confirmadas por el usuario (2026-07-16)** y anotadas en el ADR-002: programa base único por paciente (módulos extra por override), cuidador v1 sin cuenta, tareas por catálogo + creación libre, diario 24/7 separado del check-in, y visibilidad de gráficos configurable por el profesional. Los WP ya las implementan: no re-preguntes.
+**Regla de puertas** (MEMORIA §8.3): cada WP clínico se desbloquea con una conversación real del fundador (psicooncólogo → umbrales; asociación → pediatría; farma → farmacovigilancia). Los umbrales clínicos van configurables y marcados `[PENDIENTE CLÍNICO]` hasta su validación.
 
 ## Estado: F1 COMPLETO, subido y verificado
 
@@ -37,13 +33,15 @@ Repo: **github.com/rodriguezmartinezlw/botsy** (cuenta personal del usuario). 11
 
 Flujo **director/implementador**: el implementador lee `CLAUDE.md` (convenciones VINCULANTES: reglas clínicas, RLS en toda tabla, autorización DENTRO de cada Route Handler porque el middleware de Next 16 no intercepta `/api`, Zod en toda salida de LLM, secretos solo por env, español) → `docs/PLAN-MAESTRO.md` → su `docs/wp/WP-XX-*.md` → implementa SOLO ese alcance → verifica `npm run build && npm run lint && npm test` → escribe su entrega en `docs/wp/entregas/WP-XX-entrega.md` → **NO commitea** (el commit lo hace el director tras revisar y dejar `docs/revisiones/WP-XX-revision.md`). Las migraciones commiteadas jamás se editan: siempre migración nueva.
 
-## Qué toca hacer ahora (en orden — detalle en `docs/PENDIENTE.md`)
+## Qué toca hacer ahora (en orden — hoja de ruta técnica en `docs/PLAN-TECNICO-PILOTO.md`, guía en `docs/PENDIENTE.md`)
 
-1. **WP-10** — deuda técnica de F1 (7 ítems, programable YA sin claves).
-2. **WP-11** — núcleo de programas de monitorización (tablas `programas`/`programas_paciente`, config Zod con merge, gating server-side, check-in dirigido por programa, pestaña Programa en el panel, seed de las 5 plantillas).
-3. **WP-12** — tareas terapéuticas TCC + diario por voz. **WP-13** — post-cirugía/oncología + fotos clínicas. **WP-14** — modo Alzheimer + cuidador.
-4. **WP-09** — puesta en producción y E2E reales: BLOQUEADO hasta que el usuario aporte claves (Supabase, OpenAI incl. Realtime, Resend, Vercel Pro). Puede ir en paralelo cuando lleguen.
+1. **WP-10** — deuda técnica de F1 (7 ítems, programable YA, sin claves ni puertas).
+2. **WP-11 v2** — núcleo de programas ONCOLOGÍA: arquitectura + seed de los 2 programas de mama + **disposición estructurada obligatoria** + vocabulario CTCAE simplificado + consentimiento `uso_secundario`.
+3. **WP-16** (Termómetro de Distrés NCCN conversacional; puerta: psicooncólogo) → **WP-17 + WP-15** (dashboard del PATROCINADOR con agregados pseudonimizados k≥5, seed demo oncológico y modo demo + informe ROI — **al terminar esto hay demo vendible en local, sin claves**) → **WP-18** (farmacovigilancia; puerta: primera LOI) → **WP-19** (cuidador-proxy pediátrico; puerta: asociación/fundación). Specs completas en PLAN-TECNICO-PILOTO §5; los WP individuales de 16/17/15/18/19 se emiten al abrirse cada puerta.
+4. **WP-09** — producción y E2E reales: bloqueado por claves del fundador. **La venta NO lo espera.**
 
-**Pendiente que solo el usuario puede aportar:** claves/cuentas, textos legales reales (buscar `[PENDIENTE LEGAL]`), diligencia RGPD/DPA, y validación clínica de los umbrales de las plantillas (son borrador).
+**⛔ APARCADO — no implementar:** WP-12 (TCC), WP-13 (post-cirugía/fotos; su §3 fue absorbido por WP-11 v2), WP-14 (Alzheimer), toda predicción/sugerencia, todo B2C, pt-BR.
+
+**Pendiente que solo el fundador puede aportar:** las tres llamadas (MEMORIA §14: psicooncólogo, asociación de pacientes, contacto Pfizer/Roche — antes del 1 de agosto), claves/cuentas, textos legales (`[PENDIENTE LEGAL]`), diligencia RGPD/DPA, *intended purpose* con consultor regulatorio antes de material comercial.
 
 **Nota operativa:** para push, el credencial activo del CLI es `coprodelidev`; este repo es personal → `gh auth switch --user rodriguezmartinezlw && git push && gh auth switch --user coprodelidev`.
