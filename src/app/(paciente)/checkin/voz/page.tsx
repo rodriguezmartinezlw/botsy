@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { Mic } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import type { TipoConsentimiento, VerticalPaciente } from "@/types/db";
+import {
+  estadoVigenteConsentimientos,
+  type FilaConsentimiento,
+} from "@/lib/consentimientos/estado";
+import type { VerticalPaciente } from "@/types/db";
 import PantallaVoz from "./PantallaVoz";
 
 export const metadata: Metadata = { title: "Check-in por voz" };
@@ -16,11 +20,7 @@ export const metadata: Metadata = { title: "Check-in por voz" };
  */
 export default async function CheckinVozPage() {
   let vertical: VerticalPaciente = "general";
-  const consentimientos: Record<TipoConsentimiento, boolean> = {
-    conversacion: false,
-    voz_grabacion: false,
-    voz_biomarcadores: false,
-  };
+  let consentimientos = estadoVigenteConsentimientos([]);
 
   try {
     const supabase = await crearClienteServidor();
@@ -38,9 +38,10 @@ export default async function CheckinVozPage() {
       const { data: filas } = await supabase
         .from("consentimientos")
         .select("tipo, otorgado, registrado_en")
-        .eq("paciente_id", user.id)
-        .order("registrado_en", { ascending: true });
-      for (const fila of filas ?? []) consentimientos[fila.tipo] = fila.otorgado;
+        .eq("paciente_id", user.id);
+      consentimientos = estadoVigenteConsentimientos(
+        (filas ?? []) as FilaConsentimiento[],
+      );
     }
   } catch {
     // Sin Supabase configurado: degradamos a 'general' y sin consentimientos.

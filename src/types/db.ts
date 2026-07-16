@@ -183,6 +183,17 @@ export type EventoAuditoria = {
   creado_en: string;
 }
 
+export type Informe = {
+  id: string;
+  paciente_id: string;
+  generado_por: string | null;
+  periodo_desde: string;
+  periodo_hasta: string;
+  resumen: string | null;
+  modelo: string | null;
+  generado_en: string;
+}
+
 // --- Inserts (columnas con default/nulables son opcionales) -----------------
 export type PerfilInsert = {
   id: string;
@@ -317,6 +328,17 @@ export type EventoAuditoriaInsert = {
   creado_en?: string;
 }
 
+export type InformeInsert = {
+  id?: string;
+  paciente_id: string;
+  generado_por?: string | null;
+  periodo_desde: string;
+  periodo_hasta: string;
+  resumen?: string | null;
+  modelo?: string | null;
+  generado_en?: string;
+}
+
 // --- Esquema para los genéricos de supabase-js ------------------------------
 export type BaseDatos = {
   public: {
@@ -385,6 +407,12 @@ export type BaseDatos = {
         Row: EventoAuditoria;
         Insert: EventoAuditoriaInsert;
         Update: Partial<EventoAuditoriaInsert>;
+        Relationships: [];
+      };
+      informes: {
+        Row: Informe;
+        Insert: InformeInsert;
+        Update: Partial<InformeInsert>;
         Relationships: [];
       };
     };

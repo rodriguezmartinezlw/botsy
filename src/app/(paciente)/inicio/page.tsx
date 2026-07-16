@@ -2,8 +2,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Flame, Home, MessagesSquare, Mic } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
+import InterstitialConsentimiento from "@/components/paciente/InterstitialConsentimiento";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { fechaHoyEnZona } from "@/lib/ia/conversacion";
+import {
+  estadoVigenteConsentimientos,
+  puedeConversar,
+  type FilaConsentimiento,
+} from "@/lib/consentimientos/estado";
 import type { EstadoCheckin } from "@/types/db";
 
 export const metadata: Metadata = { title: "Inicio" };
@@ -12,6 +18,7 @@ type EstadoInicio = {
   nombre: string;
   rachaActual: number;
   estadoCheckinHoy: EstadoCheckin | null;
+  puedeConversar: boolean;
 };
 
 async function cargarEstado(): Promise<EstadoInicio> {
@@ -19,6 +26,7 @@ async function cargarEstado(): Promise<EstadoInicio> {
     nombre: "",
     rachaActual: 0,
     estadoCheckinHoy: null,
+    puedeConversar: false,
   };
   try {
     const supabase = await crearClienteServidor();
@@ -47,10 +55,19 @@ async function cargarEstado(): Promise<EstadoInicio> {
       .eq("fecha", fecha)
       .maybeSingle();
 
+    const { data: filasConsent } = await supabase
+      .from("consentimientos")
+      .select("tipo, otorgado, registrado_en")
+      .eq("paciente_id", user.id);
+    const consent = estadoVigenteConsentimientos(
+      (filasConsent ?? []) as FilaConsentimiento[],
+    );
+
     return {
       nombre: perfil?.nombre ?? "",
       rachaActual: paciente?.racha_actual ?? 0,
       estadoCheckinHoy: checkin?.estado ?? null,
+      puedeConversar: puedeConversar(consent),
     };
   } catch {
     return porDefecto;
@@ -63,7 +80,8 @@ function primerNombre(nombre: string): string {
 }
 
 export default async function InicioPage() {
-  const { nombre, rachaActual, estadoCheckinHoy } = await cargarEstado();
+  const { nombre, rachaActual, estadoCheckinHoy, puedeConversar: puede } =
+    await cargarEstado();
   const saludoNombre = primerNombre(nombre);
   const completado = estadoCheckinHoy === "completado";
   const enCurso = estadoCheckinHoy === "en_curso";
@@ -101,6 +119,9 @@ export default async function InicioPage() {
         </section>
       )}
 
+      {!puede ? (
+        <InterstitialConsentimiento />
+      ) : (
       <section
         aria-label="Check-in de hoy"
         className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6"
@@ -134,6 +155,7 @@ export default async function InicioPage() {
           </div>
         )}
       </section>
+      )}
 
       <p className="text-sm text-texto-tenue">
         Botsy no diagnostica ni sustituye a tu médico.

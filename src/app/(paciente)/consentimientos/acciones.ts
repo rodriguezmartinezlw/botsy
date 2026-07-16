@@ -45,7 +45,12 @@ export async function registrarConsentimiento(
       return { ok: false, error: "No se pudo guardar el consentimiento." };
     }
 
+    // Revalida las rutas cuyo contenido depende del estado de consentimientos
+    // (el gating del check-in y el interstitial).
     revalidatePath("/consentimientos");
+    revalidatePath("/inicio");
+    revalidatePath("/checkin");
+    revalidatePath("/checkin/voz");
     return { ok: true };
   } catch {
     return {

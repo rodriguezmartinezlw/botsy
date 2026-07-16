@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FichaPaciente } from "@/lib/panel/tipos";
 import LineaTemporal from "./LineaTemporal";
 import ColumnaTendencias from "./ColumnaTendencias";
+import ConsentimientosVigentes from "./ConsentimientosVigentes";
 import PanelMedicacion from "./PanelMedicacion";
 import PanelReglas from "./PanelReglas";
 
@@ -55,6 +56,7 @@ export default function FichaPacienteTabs({ ficha }: { ficha: FichaPaciente }) {
           <aside className="flex flex-col gap-4">
             <h2 className="text-lg font-bold text-texto">Tendencias</h2>
             <ColumnaTendencias tendencias={ficha.tendencias} />
+            <ConsentimientosVigentes items={ficha.timeline} />
           </aside>
         </div>
       ) : null}

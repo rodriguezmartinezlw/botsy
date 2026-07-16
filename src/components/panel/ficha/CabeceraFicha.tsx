@@ -14,8 +14,8 @@ const ETIQUETA_VERTICAL: Record<VerticalPaciente, string> = {
 
 /**
  * Cabecera de la ficha 360º (WP-06): datos del paciente, condiciones, racha y
- * botones "Ver informe" (placeholder → WP-07) y teléfono. Server component:
- * los botones son enlaces/estáticos, sin interactividad de cliente.
+ * botones "Ver informe" (enlaza al informe imprimible de WP-07) y teléfono.
+ * Server component: los botones son enlaces/estáticos, sin interactividad.
  */
 export default function CabeceraFicha({
   cabecera,
@@ -71,15 +71,13 @@ export default function CabeceraFicha({
         </div>
 
         <div className="flex shrink-0 flex-col gap-2 sm:flex-row md:flex-col">
-          <button
-            type="button"
-            disabled
-            title="Disponible en la próxima entrega (informes)"
-            className="inline-flex cursor-not-allowed items-center justify-center gap-2 rounded-[var(--radius-md)] border border-borde bg-superficie-suave px-4 py-2.5 text-base font-semibold text-texto-tenue"
+          <Link
+            href={`/pacientes/${cabecera.id}/informe`}
+            className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border border-primario bg-superficie px-4 py-2.5 text-base font-semibold text-primario hover:bg-primario-suave"
           >
             <FileText className="h-5 w-5" aria-hidden />
             Ver informe
-          </button>
+          </Link>
           {cabecera.telefono ? (
             <a
               href={`tel:${cabecera.telefono}`}

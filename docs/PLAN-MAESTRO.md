@@ -90,8 +90,8 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-03 | ✅ aprobado (commit) — ver `docs/revisiones/WP-03-revision.md` |
 | WP-05 | ✅ aprobado (commit) — ver `docs/revisiones/WP-05-revision.md` |
 | WP-06 | ✅ aprobado (commit) — ver `docs/revisiones/WP-06-revision.md` |
-| WP-07 | ▶️ siguiente (informes + consentimientos) |
-| WP-08 | ⏳ pendiente |
+| WP-07 | ✅ aprobado (commit) — ver `docs/revisiones/WP-07-revision.md` |
+| WP-08 | ▶️ último (hardening) |
 
 *(El director actualiza esta tabla en cada commit.)*
 

@@ -14,7 +14,11 @@
 
 import { respuestaError, respuestaOk } from "@/lib/http";
 import { crearClienteServidor } from "@/lib/supabase/server";
-import type { TipoConsentimiento } from "@/types/db";
+import {
+  estadoVigenteConsentimientos,
+  puedeConversar,
+  type FilaConsentimiento,
+} from "@/lib/consentimientos/estado";
 import {
   construirContexto,
   construirInstrucciones,
@@ -41,20 +45,16 @@ export async function POST(): Promise<Response> {
     }
 
     // Estado vigente de consentimientos (histórico append-only: último por tipo).
-    const consentimientos: Record<TipoConsentimiento, boolean> = {
-      conversacion: false,
-      voz_grabacion: false,
-      voz_biomarcadores: false,
-    };
     const { data: filasConsent } = await supabase
       .from("consentimientos")
       .select("tipo, otorgado, registrado_en")
-      .eq("paciente_id", user.id)
-      .order("registrado_en", { ascending: true });
-    for (const fila of filasConsent ?? []) consentimientos[fila.tipo] = fila.otorgado;
+      .eq("paciente_id", user.id);
+    const consentimientos = estadoVigenteConsentimientos(
+      (filasConsent ?? []) as FilaConsentimiento[],
+    );
 
     // Consentimiento de conversación: bloqueante.
-    if (!consentimientos.conversacion) {
+    if (!puedeConversar(consentimientos)) {
       return respuestaError(
         "Necesitas aceptar el registro de conversaciones para usar el modo voz.",
         403,

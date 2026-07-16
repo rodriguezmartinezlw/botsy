@@ -11,6 +11,11 @@
 import { respuestaError, respuestaOk } from "@/lib/http";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import {
+  estadoVigenteConsentimientos,
+  puedeConversar,
+  type FilaConsentimiento,
+} from "@/lib/consentimientos/estado";
+import {
   construirApertura,
   construirContexto,
   fechaHoyEnZona,
@@ -32,6 +37,23 @@ export async function POST(): Promise<Response> {
       .maybeSingle();
     if (!perfil || perfil.rol !== "paciente") {
       return respuestaError("Solo los pacientes pueden hacer check-in.", 403);
+    }
+
+    // Consentimiento `conversacion`: bloqueante para iniciar cualquier check-in
+    // (defensa en profundidad además del interstitial de UI). Sin él, no se
+    // puede conversar.
+    const { data: filasConsent } = await supabase
+      .from("consentimientos")
+      .select("tipo, otorgado, registrado_en")
+      .eq("paciente_id", user.id);
+    const estadoConsent = estadoVigenteConsentimientos(
+      (filasConsent ?? []) as FilaConsentimiento[],
+    );
+    if (!puedeConversar(estadoConsent)) {
+      return respuestaError(
+        "Necesitas aceptar el registro de conversaciones para hacer tu check-in.",
+        403,
+      );
     }
 
     const fecha = fechaHoyEnZona(perfil.zona_horaria ?? "Europe/Madrid");

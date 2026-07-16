@@ -117,3 +117,49 @@ body {
     opacity: 0;
   }
 }
+
+/*
+  Impresión del informe de seguimiento (WP-07).
+  Oculta la navegación del panel y los controles (period/imprimir), quita el
+  cromado del documento y evita cortes feos entre secciones. Estilo sobrio,
+  como los /print de otros proyectos de la casa.
+*/
+@media print {
+  @page {
+    margin: 1.4cm;
+  }
+
+  body {
+    background: #ffffff;
+  }
+
+  /* Ocultar navegación del panel y cualquier control marcado. */
+  nav[aria-label="Navegación del panel"],
+  [data-no-print] {
+    display: none !important;
+  }
+
+  /* Contenido a ancho completo, sin padding de layout. */
+  main {
+    padding: 0 !important;
+  }
+
+  /* El documento del informe sin borde/relleno de tarjeta al imprimir. */
+  .informe-doc {
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* No partir una sección/tarjeta entre dos páginas. */
+  .informe-seccion {
+    break-inside: avoid;
+  }
+
+  /* Conservar fondos/colores de las píldoras y puntos en papel. */
+  .informe-doc {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
