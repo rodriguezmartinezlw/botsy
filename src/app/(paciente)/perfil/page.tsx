@@ -1,26 +1,31 @@
 import type { Metadata } from "next";
-import { User } from "lucide-react";
-import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
+import CabeceraPerfil from "@/components/paciente/perfil/CabeceraPerfil";
+import PanelPerfil from "@/components/paciente/perfil/PanelPerfil";
+import { cargarDatosPerfil } from "./datos";
 
 export const metadata: Metadata = {
   title: "Perfil",
 };
 
-export default function PerfilPage() {
-  return (
-    <div className="flex flex-col gap-8">
-      <EncabezadoPagina
-        titulo="Tu perfil"
-        descripcion="Aquí verás tu evolución y tus datos. Tú decides qué compartes; puedes revisarlo cuando quieras."
-        icono={<User className="h-6 w-6" aria-hidden />}
-      />
+/**
+ * Perfil evolutivo del paciente (WP-05).
+ *
+ * Server Component: carga y AGREGA los datos en el servidor (RLS 'propio' de
+ * WP-01) y pasa las series YA CALCULADAS a los componentes cliente de gráfico.
+ * No hay ningún fetch de datos desde el cliente. Reflejo de lo registrado; sin
+ * contenido que diagnostique.
+ */
+export default async function PerfilPage() {
+  const datos = await cargarDatosPerfil();
 
-      <section className="flex flex-col gap-2 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6">
-        <h2 className="text-lg font-semibold text-texto">Tu evolución</h2>
-        <p className="text-base text-texto-suave">
-          Cuando empieces a hacer check-ins, aquí aparecerá tu progreso.
-        </p>
-      </section>
+  return (
+    <div className="flex flex-col gap-6">
+      <CabeceraPerfil cabecera={datos.cabecera} />
+      <PanelPerfil datos={datos} />
+      <p className="text-sm text-texto-tenue">
+        Esto refleja lo que registras en tus check-ins. Botsy no diagnostica ni
+        sustituye a tu médico.
+      </p>
     </div>
   );
 }
