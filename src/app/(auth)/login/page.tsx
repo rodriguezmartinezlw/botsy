@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { destinoSeguro } from "@/lib/auth/roles";
 import FormularioLogin from "./FormularioLogin";
 
 export const metadata: Metadata = {
@@ -19,10 +20,7 @@ export default async function LoginPage({
   const esProfesional = rol === "profesional";
   // Destino tras autenticar (sesión expirada): solo rutas relativas seguras
   // (evita open-redirect). Si no es válido, se usa la ruta por rol.
-  const destino =
-    typeof next === "string" && next.startsWith("/") && !next.startsWith("//")
-      ? next
-      : null;
+  const destino = destinoSeguro(next);
 
   return (
     <div className="flex flex-col gap-6">

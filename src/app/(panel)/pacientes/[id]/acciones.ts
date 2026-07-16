@@ -135,9 +135,13 @@ export async function cambiarEstadoPauta(entrada: unknown): Promise<ResultadoAcc
   const sesion = await obtenerSesionPanel();
   if (!sesion) return { ok: false, error: FALLO_SESION };
 
+  // WP-10 ítem 1: al desactivar se fecha la baja; al reactivar se limpia.
   const { error } = await sesion.supabase
     .from("pautas_medicacion")
-    .update({ activa: p.activa })
+    .update({
+      activa: p.activa,
+      desactivada_en: p.activa ? null : new Date().toISOString(),
+    })
     .eq("id", p.pautaId)
     .eq("paciente_id", p.pacienteId);
 

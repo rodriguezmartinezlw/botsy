@@ -16,9 +16,44 @@ import {
   cifrasPermitidas,
   construirHechos,
   extraerCifras,
+  extraerCifrasEnLetras,
   generarResumenEjecutivo,
   validarResumenSinCifrasInventadas,
 } from "./resumen";
+
+// --- WP-10 ítem 4: cifras escritas con LETRAS -------------------------------
+describe("validador de cifras en letras (WP-10 ítem 4)", () => {
+  it("reconoce números en palabras es-ES", () => {
+    expect(extraerCifrasEnLetras("cuarenta y dos por ciento")).toContain("42");
+    expect(extraerCifrasEnLetras("tomó dieciséis dosis")).toContain("16");
+    expect(extraerCifrasEnLetras("cien pacientes")).toContain("100");
+    expect(extraerCifrasEnLetras("mil quinientos")).toContain("1500");
+    expect(extraerCifrasEnLetras("veintitrés días")).toContain("23");
+  });
+
+  it("no inventa números donde no los hay", () => {
+    expect(extraerCifrasEnLetras("el paciente y su médico")).toEqual([]);
+  });
+
+  it("descarta un resumen con una cifra en letras ajena a los datos", () => {
+    const permitidas = new Set(["30", "10"]);
+    const v = validarResumenSinCifrasInventadas(
+      "La adherencia fue de cuarenta y dos sobre cien.",
+      permitidas,
+    );
+    expect(v.ok).toBe(false);
+    if (!v.ok) expect(v.intrusas).toContain("42");
+  });
+
+  it("acepta un resumen cuyo número en letras SÍ está en los datos", () => {
+    const permitidas = new Set(["42", "10"]);
+    const v = validarResumenSinCifrasInventadas(
+      "La puntuación fue de cuarenta y dos.",
+      permitidas,
+    );
+    expect(v.ok).toBe(true);
+  });
+});
 
 const MODELO = "gpt-5-mini";
 

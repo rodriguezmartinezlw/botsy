@@ -52,6 +52,11 @@ export interface RepositorioAcciones {
   crearAlerta(alerta: AlertaNueva): Promise<void>;
   actualizarRiesgo(checkinId: string, nivel: NivelRiesgo): Promise<void>;
   registrarAuditoria(evento: EventoEscalado): Promise<void>;
+  /**
+   * Aviso inmediato al profesional asignado ante una alerta de URGENCIA nueva
+   * (WP-10 ítem 5, RF-ES-03). Best-effort; se llama una sola vez por alerta.
+   */
+  notificarUrgencia(pacienteId: string, checkinId: string): Promise<void>;
 }
 
 export type ResultadoAcciones = {
@@ -148,6 +153,10 @@ export async function aplicarEscalado(
         alertas_creadas: alertasCreadas,
       },
     });
+    // WP-10 ítem 5: aviso inmediato al profesional si la escalada es urgencia.
+    if (riesgoFinal === "urgencia") {
+      await repo.notificarUrgencia(evaluacion.pacienteId, evaluacion.checkinId);
+    }
   }
 
   return { alertasCreadas, nivel: evaluacion.nivel, riesgoFinal };
@@ -224,6 +233,11 @@ export async function aplicarEscaladoSenalGenerica(
     },
   });
 
+  // WP-10 ítem 5: aviso inmediato al profesional si la señal genérica es urgencia.
+  if (nivel === "urgencia") {
+    await repo.notificarUrgencia(evaluacion.pacienteId, evaluacion.checkinId);
+  }
+
   return { alertasCreadas: 1, nivel, riesgoFinal: nivel };
 }
 
@@ -284,6 +298,12 @@ export function crearRepositorioAcciones(supabase: ClienteBD): RepositorioAccion
         entidad_id: evento.checkinId,
         detalle: evento.detalle,
       });
+    },
+
+    async notificarUrgencia(pacienteId, checkinId) {
+      // Best-effort (el módulo se traga sus errores): el email no rompe el escalado.
+      const { notificarUrgenciaProfesional } = await import("./notificacion");
+      await notificarUrgenciaProfesional(supabase, pacienteId, checkinId);
     },
   };
 }

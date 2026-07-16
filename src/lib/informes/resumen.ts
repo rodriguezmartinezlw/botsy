@@ -150,6 +150,92 @@ export function extraerCifras(texto: string): string[] {
   });
 }
 
+// --- Números escritos con LETRAS (WP-10 ítem 4) ------------------------------
+// Un modelo puede alucinar una cifra en palabras ("cuarenta y dos por ciento")
+// evitando el filtro de dígitos. Parser básico es-ES (0–9999) para cerrarlo.
+
+/** Quita acentos y pasa a minúsculas para casar "dieciséis"/"dieciseis". */
+function sinAcentos(s: string): string {
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+}
+
+const UNIDAD: Record<string, number> = {
+  cero: 0, uno: 1, un: 1, una: 1, dos: 2, tres: 3, cuatro: 4, cinco: 5,
+  seis: 6, siete: 7, ocho: 8, nueve: 9, diez: 10, once: 11, doce: 12,
+  trece: 13, catorce: 14, quince: 15, dieciseis: 16, diecisiete: 17,
+  dieciocho: 18, diecinueve: 19, veinte: 20, veintiuno: 21, veintiun: 21,
+  veintiuna: 21, veintidos: 22, veintitres: 23, veinticuatro: 24,
+  veinticinco: 25, veintiseis: 26, veintisiete: 27, veintiocho: 28,
+  veintinueve: 29,
+};
+const DECENA: Record<string, number> = {
+  treinta: 30, cuarenta: 40, cincuenta: 50, sesenta: 60, setenta: 70,
+  ochenta: 80, noventa: 90,
+};
+const CENTENA: Record<string, number> = {
+  cien: 100, ciento: 100, doscientos: 200, trescientos: 300,
+  cuatrocientos: 400, quinientos: 500, seiscientos: 600, setecientos: 700,
+  ochocientos: 800, novecientos: 900,
+};
+
+function esPalabraNumero(t: string): boolean {
+  return t in UNIDAD || t in DECENA || t in CENTENA || t === "mil";
+}
+
+/** Valor de una secuencia 0–999 (sin "mil"); null si no reconoce nada. */
+function valorHasta999(tokens: string[]): number | null {
+  let total = 0;
+  let i = 0;
+  let reconocido = false;
+  if (tokens[i] in CENTENA) { total += CENTENA[tokens[i]]; i++; reconocido = true; }
+  if (tokens[i] in DECENA) {
+    total += DECENA[tokens[i]]; i++; reconocido = true;
+    if (tokens[i] === "y" && tokens[i + 1] in UNIDAD) { total += UNIDAD[tokens[i + 1]]; }
+  } else if (tokens[i] in UNIDAD) {
+    total += UNIDAD[tokens[i]]; reconocido = true;
+  }
+  return reconocido ? total : null;
+}
+
+/** Valor de una frase numérica completa (0–9999, con "mil"); null si no reconoce. */
+function valorFrase(tokens: string[]): number | null {
+  const k = tokens.indexOf("mil");
+  if (k === -1) return valorHasta999(tokens);
+  const antes = tokens.slice(0, k);
+  const despues = tokens.slice(k + 1);
+  const mult = antes.length > 0 ? valorHasta999(antes) ?? 0 : 1;
+  const resto = despues.length > 0 ? valorHasta999(despues) ?? 0 : 0;
+  return mult * 1000 + resto;
+}
+
+/** Extrae, canonicalizadas, las cifras escritas con LETRAS presentes en el texto. */
+export function extraerCifrasEnLetras(texto: string): string[] {
+  const palabras = sinAcentos(texto).match(/[a-zñ]+/g) ?? [];
+  const valores: string[] = [];
+  let run: string[] = [];
+  const cerrar = () => {
+    // Quita un "y" colgante al final del run antes de evaluar.
+    while (run.length > 0 && run[run.length - 1] === "y") run.pop();
+    if (run.length > 0) {
+      const v = valorFrase(run);
+      if (v !== null) valores.push(canonico(v));
+    }
+    run = [];
+  };
+  for (let i = 0; i < palabras.length; i++) {
+    const p = palabras[i];
+    if (esPalabraNumero(p)) {
+      run.push(p);
+    } else if (p === "y" && run.length > 0 && esPalabraNumero(palabras[i + 1] ?? "")) {
+      run.push("y");
+    } else {
+      cerrar();
+    }
+  }
+  cerrar();
+  return valores;
+}
+
 export type ResultadoValidacion =
   | { ok: true }
   | { ok: false; intrusas: string[] };
@@ -162,7 +248,9 @@ export function validarResumenSinCifrasInventadas(
   resumen: string,
   permitidas: Set<string>,
 ): ResultadoValidacion {
-  const intrusas = extraerCifras(resumen).filter((c) => !permitidas.has(c));
+  const enDigitos = extraerCifras(resumen);
+  const enLetras = extraerCifrasEnLetras(resumen); // WP-10 ítem 4
+  const intrusas = [...enDigitos, ...enLetras].filter((c) => !permitidas.has(c));
   return intrusas.length === 0 ? { ok: true } : { ok: false, intrusas };
 }
 

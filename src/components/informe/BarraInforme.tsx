@@ -1,13 +1,16 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { format, subDays } from "date-fns";
-import { Printer } from "lucide-react";
+import { Printer, Save } from "lucide-react";
+import { guardarInforme } from "@/app/(panel)/pacientes/[id]/informe/acciones";
 
 /**
- * Controles del informe (WP-07): selector de período con presets (7/30/90 días)
- * y botón Imprimir. Se oculta en impresión (`data-no-print`, ver globals.css).
- * Cliente: navega cambiando `?desde&hasta` y dispara `window.print()`.
+ * Controles del informe (WP-07 + WP-10 ítem 3): selector de período con presets
+ * (7/30/90 días), botón Imprimir y botón "Guardar informe" (persistencia
+ * EXPLÍCITA: el informe se renderiza siempre, pero solo se guarda en `informes`
+ * al pulsar, evitando una fila por cada recarga). Se oculta en impresión.
  */
 const PRESETS = [
   { dias: 7, etiqueta: "7 días" },
@@ -19,12 +22,33 @@ export default function BarraInforme({
   pacienteId,
   desde,
   hasta,
+  resumen,
+  modelo,
 }: {
   pacienteId: string;
   desde: string;
   hasta: string;
+  resumen: string | null;
+  modelo: string | null;
 }) {
   const router = useRouter();
+  const [guardando, setGuardando] = useState(false);
+  const [guardado, setGuardado] = useState(false);
+  const [errorGuardar, setErrorGuardar] = useState<string | null>(null);
+
+  async function alGuardar() {
+    setGuardando(true);
+    setErrorGuardar(null);
+    try {
+      const r = await guardarInforme({ pacienteId, desde, hasta, resumen, modelo });
+      if (r.ok) setGuardado(true);
+      else setErrorGuardar(r.error ?? "No se pudo guardar.");
+    } catch {
+      setErrorGuardar("No se pudo guardar el informe.");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   function aplicarPreset(dias: number) {
     const hoy = new Date();
@@ -70,14 +94,31 @@ export default function BarraInforme({
         })}
       </div>
 
-      <button
-        type="button"
-        onClick={() => window.print()}
-        className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-primario px-5 py-2.5 text-base font-semibold text-white hover:bg-primario-fuerte"
-      >
-        <Printer className="h-5 w-5" aria-hidden />
-        Imprimir
-      </button>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={alGuardar}
+          disabled={guardando || guardado}
+          aria-live="polite"
+          className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] border border-borde bg-superficie px-4 py-2.5 text-base font-semibold text-texto hover:text-primario disabled:opacity-60"
+        >
+          <Save className="h-5 w-5" aria-hidden />
+          {guardado ? "Guardado" : guardando ? "Guardando…" : "Guardar informe"}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.print()}
+          className="inline-flex items-center justify-center gap-2 rounded-[var(--radius-md)] bg-primario px-5 py-2.5 text-base font-semibold text-white hover:bg-primario-fuerte"
+        >
+          <Printer className="h-5 w-5" aria-hidden />
+          Imprimir
+        </button>
+      </div>
+      {errorGuardar ? (
+        <p role="alert" className="text-sm text-red-600">
+          {errorGuardar}
+        </p>
+      ) : null}
     </div>
   );
 }

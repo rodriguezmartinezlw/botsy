@@ -101,6 +101,17 @@ describe("RLS — invariantes de la matriz de acceso (WP-01)", () => {
     // Ninguna política concede acceso al rol anon.
     expect(RLS).not.toMatch(/create policy[\s\S]*?\sto anon\b/);
   });
+
+  it("auditoría endurecida (WP-10 ítem 2): el INSERT autenticado exige actor_id = auth.uid()", () => {
+    const RLS5 = readFileSync(
+      join(RAIZ, "supabase", "migrations", "0005_deuda_tecnica.sql"),
+      "utf8",
+    );
+    // La política se recrea en 0005 con el check estricto (un autenticado solo
+    // puede atribuirse eventos a sí mismo; el motor service-role bypasea RLS).
+    expect(RLS5).toMatch(/auditoria_insert_autenticado/);
+    expect(RLS5).toMatch(/with check \(actor_id = auth\.uid\(\)\)/);
+  });
 });
 
 // =====================================================================

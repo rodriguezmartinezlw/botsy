@@ -244,6 +244,7 @@ function repoAccionesMemoria() {
   const alertas: AlertaNueva[] = [];
   const audits: EventoEscalado[] = [];
   const riesgos: { checkinId: string; nivel: NivelRiesgo }[] = [];
+  const notificaciones: { pacienteId: string; checkinId: string }[] = [];
 
   const repo: RepositorioAcciones = {
     async alertaExiste(checkinId, reglaId) {
@@ -265,9 +266,12 @@ function repoAccionesMemoria() {
     async registrarAuditoria(e) {
       audits.push(e);
     },
+    async notificarUrgencia(pacienteId, checkinId) {
+      notificaciones.push({ pacienteId, checkinId });
+    },
   };
 
-  return { repo, alertas, audits, riesgos };
+  return { repo, alertas, audits, riesgos, notificaciones };
 }
 
 function evaluacionToracicoDisnea(): EvaluacionCheckin {
@@ -319,9 +323,13 @@ describe("aplicarEscalado — E2E dolor torácico + disnea → urgencia", () => 
     expect(m.audits).toHaveLength(1);
     const auditStr = JSON.stringify(m.audits[0].detalle);
     expect(auditStr).toContain("urgencia");
+
+    // WP-10 ítem 5: aviso inmediato al profesional (una vez, con el check-in).
+    expect(m.notificaciones).toHaveLength(1);
+    expect(m.notificaciones[0].checkinId).toBe("chk-1");
   });
 
-  it("es idempotente: re-evaluar no duplica la alerta ni la auditoría", async () => {
+  it("es idempotente: re-evaluar no duplica la alerta, la auditoría ni el aviso", async () => {
     const evaluacion = evaluacionToracicoDisnea();
     const m = repoAccionesMemoria();
 
@@ -332,6 +340,31 @@ describe("aplicarEscalado — E2E dolor torácico + disnea → urgencia", () => 
     expect(r2.alertasCreadas).toBe(0);
     expect(m.alertas).toHaveLength(1);
     expect(m.audits).toHaveLength(1);
+    // El aviso de urgencia también es idempotente (WP-10 ítem 5).
+    expect(m.notificaciones).toHaveLength(1);
+  });
+
+  it("una escalada de nivel 'contactar' NO avisa al profesional por email", async () => {
+    // dolor >= 9 → contactar (no urgencia): se crea alerta pero sin email.
+    const d = datos({
+      observaciones: [{ dominio: "dolor", codigo: "dolor", valorNum: 9 }],
+    });
+    const { nivel, reglasDisparadas } = evaluarReglas(d, TODAS_LAS_REGLAS);
+    expect(nivel).toBe("contactar");
+    const evaluacion: EvaluacionCheckin = {
+      checkinId: "chk-2",
+      pacienteId: "pac-1",
+      riesgoActual: null,
+      nivel,
+      reglasDisparadas,
+      mensajesRelevantes: [],
+      senalesDetectadas: [],
+    };
+    const m = repoAccionesMemoria();
+    const res = await aplicarEscalado(evaluacion, m.repo);
+    expect(res.riesgoFinal).toBe("contactar");
+    expect(m.alertas.length).toBeGreaterThan(0);
+    expect(m.notificaciones).toHaveLength(0);
   });
 
   it("nivel normal no crea alertas ni auditoría", async () => {

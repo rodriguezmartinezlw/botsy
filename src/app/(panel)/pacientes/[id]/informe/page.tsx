@@ -69,23 +69,19 @@ export default async function InformePage({
 
   const generadoEn = new Date().toISOString();
 
-  // Trazabilidad: persistir el informe (best-effort; nunca rompe el render).
-  try {
-    await sesion.supabase.from("informes").insert({
-      paciente_id: id,
-      generado_por: sesion.userId,
-      periodo_desde: desde,
-      periodo_hasta: hasta,
-      resumen: resumen.estado === "ok" ? resumen.resumen : null,
-      modelo: resumen.estado === "ok" ? modelo : null,
-    });
-  } catch {
-    // No bloquea el informe si la persistencia falla.
-  }
+  // WP-10 ítem 3: el informe se RENDERIZA siempre; la persistencia en `informes`
+  // es EXPLÍCITA (botón "Guardar informe" de la barra), para no crear una fila
+  // por cada recarga. Ver src/app/(panel)/pacientes/[id]/informe/acciones.ts.
 
   return (
     <div className="flex flex-col gap-5">
-      <BarraInforme pacienteId={id} desde={desde} hasta={hasta} />
+      <BarraInforme
+        pacienteId={id}
+        desde={desde}
+        hasta={hasta}
+        resumen={resumen.estado === "ok" ? resumen.resumen : null}
+        modelo={resumen.estado === "ok" ? modelo : null}
+      />
       <InformeVista datos={datos} resumen={resumen} fechaGeneracion={generadoEn} />
     </div>
   );

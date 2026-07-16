@@ -308,7 +308,7 @@ export async function cargarFichaPaciente(
 
     const { data: pautas } = await supabase
       .from("pautas_medicacion")
-      .select("id, farmaco, dosis, momentos, critica, activa, creado_en")
+      .select("id, farmaco, dosis, momentos, critica, activa, creado_en, desactivada_en")
       .eq("paciente_id", pacienteId)
       .order("creado_en", { ascending: false });
 
@@ -390,7 +390,21 @@ export async function cargarFichaPaciente(
         dosis: p.dosis,
         critica: p.critica,
         activa: p.activa,
+        evento: "alta",
       });
+      // WP-10 ítem 1: evento fechado de baja cuando la pauta se desactivó.
+      if (p.desactivada_en) {
+        timeline.push({
+          tipo: "medicacion",
+          id: `${p.id}:baja`,
+          ts: p.desactivada_en,
+          farmaco: p.farmaco,
+          dosis: p.dosis,
+          critica: p.critica,
+          activa: false,
+          evento: "baja",
+        });
+      }
     }
     for (const c of consentimientos ?? []) {
       timeline.push({

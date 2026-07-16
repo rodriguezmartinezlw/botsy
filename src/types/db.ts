@@ -86,6 +86,7 @@ export type PautaMedicacion = {
   activa: boolean;
   creada_por: string | null;
   creado_en: string;
+  desactivada_en: string | null;
 }
 
 export type Checkin = {
@@ -231,6 +232,7 @@ export type PautaMedicacionInsert = {
   activa?: boolean;
   creada_por?: string | null;
   creado_en?: string;
+  desactivada_en?: string | null;
 }
 
 export type CheckinInsert = {

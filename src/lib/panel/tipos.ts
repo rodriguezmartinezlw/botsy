@@ -68,6 +68,8 @@ export type ItemMedicacion = {
   dosis: string | null;
   critica: boolean;
   activa: boolean;
+  /** "alta" = creación de la pauta; "baja" = desactivación fechada (WP-10 ítem 1). */
+  evento: "alta" | "baja";
 };
 
 export type ItemConsentimiento = {

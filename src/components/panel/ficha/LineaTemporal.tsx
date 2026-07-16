@@ -166,12 +166,17 @@ function FilaItem({ item }: { item: ItemTimeline }) {
     }
     case "medicacion": {
       const m = item as ItemMedicacion;
+      const esBaja = m.evento === "baja";
       return (
         <Fila
           icono={<Pill className="h-4 w-4" />}
-          color="#059669"
-          titulo={`Pauta: ${m.farmaco}${m.dosis ? ` · ${m.dosis}` : ""}`}
-          subtitulo={`${m.critica ? "Medicación importante · " : ""}${m.activa ? "activa" : "desactivada"}`}
+          color={esBaja ? "#6B7280" : "#059669"}
+          titulo={`${esBaja ? "Pauta desactivada" : "Pauta"}: ${m.farmaco}${m.dosis ? ` · ${m.dosis}` : ""}`}
+          subtitulo={
+            esBaja
+              ? "Se dio de baja esta pauta"
+              : `${m.critica ? "Medicación importante · " : ""}${m.activa ? "activa" : "desactivada"}`
+          }
           ts={m.ts}
         />
       );
