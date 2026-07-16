@@ -32,7 +32,7 @@ El "cuaderno del paciente" hablado: el psicólogo prescribe tareas entre sesione
 
 ### 5. Diario libre "Cuéntale a Botsy" (flag `diario`)
 
-- Sesión libre 24/7 separada del check-in (pregunta abierta #4 de ADR-002 — implementa la propuesta: separada): escucha activa, extracción ligera (ánimo, temas) a `diario_entradas.extraccion`, resumen breve. Escalado en vivo activo. Grabación de audio solo con consentimiento `voz_grabacion` (mismo patrón WP-03).
+- Sesión libre 24/7 separada del check-in (decisión confirmada 2026-07-16, ADR-002 §Decisiones): escucha activa, extracción ligera (ánimo, temas) a `diario_entradas.extraccion`, resumen breve. Escalado en vivo activo. Grabación de audio solo con consentimiento `voz_grabacion` (mismo patrón WP-03).
 - El check-in del día siguiente puede referenciarlo con naturalidad (memoria longitudinal: incluir resúmenes de diario recientes en `construirContexto`).
 
 ### 6. Integración con el check-in

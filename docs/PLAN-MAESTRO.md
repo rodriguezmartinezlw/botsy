@@ -112,7 +112,7 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 |---|---|
 | WP-09 | ⏳ bloqueado por insumos del usuario (claves/cuentas) |
 | WP-10 | ⏳ pendiente — programable ya |
-| WP-11 | ⏳ pendiente — programable ya (leer ADR-002; 5 preguntas abiertas al usuario) |
+| WP-11 | ⏳ pendiente — programable ya (leer ADR-002; decisiones de producto ya confirmadas) |
 | WP-12…WP-14 | ⏳ pendientes — tras WP-11 |
 
 *(El director actualiza esta tabla en cada commit.)*

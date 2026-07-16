@@ -25,7 +25,7 @@ WP-09 no bloquea a los demás; se ejecuta cuando el usuario cree el proyecto Sup
 
 ## Decisiones/insumos que solo puede aportar el usuario
 
-1. Las **5 preguntas abiertas de ADR-002** (programa combinable, cuidador, tareas libres, diario 24/7, visibilidad de gráficos).
+1. ~~Las 5 preguntas abiertas de ADR-002~~ → **✅ CONFIRMADAS el 2026-07-16** (ver ADR-002 §Decisiones confirmadas; los WP-11..14 ya las implementan tal cual, sin ajustes).
 2. **Claves y cuentas** (prereq. de WP-09): proyecto Supabase (cuenta por confirmar — el repo GitHub ya es personal `rodriguezmartinezlw`), `OPENAI_API_KEY` (texto + Realtime), Resend (+dominio verificado para `RESEND_FROM`), Vercel (el cron horario requiere plan **Pro**).
 3. **Textos legales reales** donde hay `[PENDIENTE LEGAL]` (consentimientos, aviso de urgencias, informe).
 4. **Diligencia RGPD/DPA** de proveedores (OpenAI, Resend, Supabase) antes de pacientes reales; DPIA.

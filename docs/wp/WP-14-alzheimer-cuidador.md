@@ -1,6 +1,6 @@
 # WP-14 — Programa Alzheimer: modo voz-solo accesible + rol cuidador (v1)
 
-**Depende de:** WP-11 (y WP-13 para el patrón de reglas nuevas) · **Funcional:** RF-CV-09, ADR-002 (plantilla alzheimer, pregunta abierta #2 — implementa la propuesta v1 SIN cuenta de cuidador) · **Perfil:** salud geriátrica / deterioro cognitivo.
+**Depende de:** WP-11 (y WP-13 para el patrón de reglas nuevas) · **Funcional:** RF-CV-09, ADR-002 (plantilla alzheimer; decisión confirmada 2026-07-16: cuidador v1 SIN cuenta) · **Perfil:** salud geriátrica / deterioro cognitivo.
 
 ## Objetivo
 

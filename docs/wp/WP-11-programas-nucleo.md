@@ -11,7 +11,7 @@ La entidad **programa** y toda su tubería: catálogo de plantillas → asignaci
 ### 1. Migración (siguiente número libre): `programas` + `programas_paciente`
 
 - `programas`: `clave text unique`, `nombre`, `descripcion`, `version int default 1`, `config jsonb not null`, `activo boolean default true`. RLS: SELECT profesionales/admin; escritura solo admin.
-- `programas_paciente`: `paciente_id FK`, `programa_id FK`, `config_override jsonb default '{}'`, `fase_actual int default 0`, `fecha_inicio date`, `fecha_evento date null` (p. ej. cirugía), `estado check in ('activo','completado','suspendido')`, `asignado_por FK perfiles`. **UNIQUE parcial: un solo programa `activo` por paciente** (pregunta abierta #1 de ADR-002: si el usuario decide "combinables", se relaja en migración posterior — por defecto implementa ÚNICO). RLS: paciente SELECT lo suyo; profesional SELECT/INSERT/UPDATE de sus asignados; admin todo.
+- `programas_paciente`: `paciente_id FK`, `programa_id FK`, `config_override jsonb default '{}'`, `fase_actual int default 0`, `fecha_inicio date`, `fecha_evento date null` (p. ej. cirugía), `estado check in ('activo','completado','suspendido')`, `asignado_por FK perfiles`. **UNIQUE parcial: un solo programa `activo` por paciente** (decisión confirmada 2026-07-16, ADR-002 §Decisiones: programa base único; los módulos extra se activan vía `config_override`). RLS: paciente SELECT lo suyo; profesional SELECT/INSERT/UPDATE de sus asignados; admin todo.
 - Validar con libpg_query.
 
 ### 2. Config canónica tipada (`src/lib/programas/config.ts`)

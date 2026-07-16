@@ -1,6 +1,6 @@
 # ADR-002 — Programas de monitorización (plataforma multi-perfil)
 
-**Estado:** Aceptada en arquitectura; **plantillas clínicas pendientes de validación con el usuario y asesoría clínica** · **Fecha:** 2026-07-16 · **Origen:** conversación con el CEO (Luis): "el profesional, según el tipo de paciente, debe activarle o no ciertas funcionalidades de la app".
+**Estado:** Aceptada — decisiones de producto **confirmadas por el usuario el 2026-07-16** (ver §Decisiones confirmadas); los umbrales clínicos de las plantillas siguen pendientes de validación con asesoría clínica · **Fecha:** 2026-07-16 · **Origen:** conversación con el CEO (Luis): "el profesional, según el tipo de paciente, debe activarle o no ciertas funcionalidades de la app".
 
 ## Contexto
 
@@ -51,10 +51,12 @@ La `config` efectiva = merge(plantilla.config, asignación.config_override), tip
 - Los módulos nuevos (tareas, diario, fotos, cuidador) se construyen **una vez** y se activan por programa: el producto escala a nuevos perfiles añadiendo plantillas, no código.
 - **Regulatorio:** la personalización clínica acerca las funciones a MDR. F2 se mantiene como registro/señal (lenguaje no diagnóstico ya vigente) y **cada plantilla debe validarse con asesoría clínica antes de usarse con pacientes reales** (los umbrales de las tablas son borrador).
 
-## Preguntas abiertas (a decidir con el usuario antes o durante WP-11)
+## Decisiones confirmadas por el usuario (2026-07-16)
 
-1. **¿Programa único o combinables?** Propuesta: un programa base por paciente + módulos adicionales activables (cubre "psiquiatría + TCC").
-2. **Rol cuidador (Alzheimer):** propuesta v1 sin cuenta (email/teléfono que recibe avisos y confirma tomas por enlace firmado); cuenta completa con acceso limitado en v2.
-3. **Tareas terapéuticas:** ¿catálogo de plantillas + creación libre del profesional? Propuesta: ambas.
-4. **Diario de pensamientos:** ¿sesión separada del check-in, disponible 24/7? Propuesta: sí ("Cuéntale a Botsy"), con el escalado en vivo también activo ahí.
-5. **¿Qué ve el paciente de sus propios gráficos** en perfiles de salud mental? Propuesta: configurable por programa (`perfil_graficos`), decisión del profesional.
+1. **Programa base ÚNICO por paciente**, con módulos adicionales activables vía `config_override` (cubre "psiquiatría + TCC" sin combinar plantillas). WP-11 implementa el UNIQUE parcial tal cual.
+2. **Cuidador v1 SIN cuenta** (email/teléfono que recibe avisos); cuenta completa con acceso limitado queda para v2. WP-14 tal cual.
+3. **Tareas terapéuticas: ambas** — catálogo de plantillas por tipo + creación libre del profesional. WP-12 tal cual.
+4. **Diario "Cuéntale a Botsy": sesión separada del check-in, disponible 24/7**, con escalado en vivo activo. WP-12 tal cual.
+5. **Visibilidad de gráficos del propio paciente: configurable por programa** (`perfil_graficos`), decisión del profesional. WP-11 tal cual.
+
+Los WP-11..14 ya implementan estas decisiones por defecto: **no requieren ajuste**.
