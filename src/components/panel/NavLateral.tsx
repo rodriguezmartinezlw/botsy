@@ -13,9 +13,14 @@ const items = [
 /**
  * Navegación del panel profesional.
  * Responsive: sidebar fija en escritorio (md+), barra superior en móvil.
- * Cliente: resalta el ítem activo según la ruta.
+ * Cliente: resalta el ítem activo según la ruta y muestra el nº de alertas
+ * nuevas (badge) en el ítem de Alertas (WP-06).
  */
-export default function NavLateral() {
+export default function NavLateral({
+  alertasNuevas = 0,
+}: {
+  alertasNuevas?: number;
+}) {
   const pathname = usePathname();
 
   return (
@@ -49,7 +54,15 @@ export default function NavLateral() {
                 }`}
               >
                 <Icono className="h-5 w-5" aria-hidden />
-                {label}
+                <span className="flex-1">{label}</span>
+                {href === "/alertas" && alertasNuevas > 0 ? (
+                  <span
+                    className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#dc2626] px-1.5 text-xs font-bold text-white"
+                    aria-label={`${alertasNuevas} alertas nuevas`}
+                  >
+                    {alertasNuevas > 99 ? "99+" : alertasNuevas}
+                  </span>
+                ) : null}
               </Link>
             </li>
           );

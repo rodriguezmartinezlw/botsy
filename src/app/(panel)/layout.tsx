@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import NavLateral from "@/components/panel/NavLateral";
 import { obtenerRolSesion } from "@/lib/auth/sesion";
+import { contarAlertasNuevas } from "@/lib/panel/datos";
 
 /**
  * Layout del panel profesional.
@@ -19,9 +20,11 @@ export default async function PanelLayout({
   if (!rol) redirect("/login");
   if (rol !== "profesional" && rol !== "admin") redirect("/inicio");
 
+  const alertasNuevas = await contarAlertasNuevas();
+
   return (
     <div className="flex min-h-dvh flex-col bg-fondo md:flex-row">
-      <NavLateral />
+      <NavLateral alertasNuevas={alertasNuevas} />
       <main className="flex-1 px-6 py-8 md:px-10 md:py-10">
         <div className="mx-auto w-full max-w-5xl">{children}</div>
       </main>

@@ -1,26 +1,31 @@
 import type { Metadata } from "next";
 import { Users } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
+import ListaPacientes from "@/components/panel/ListaPacientes";
+import { listarPacientes } from "@/lib/panel/datos";
 
 export const metadata: Metadata = {
   title: "Pacientes",
 };
 
-export default function PacientesPage() {
+/**
+ * Lista de pacientes del profesional (WP-06).
+ *
+ * Server Component: lee con el cliente de servidor (la RLS de WP-01 devuelve
+ * SÓLO los pacientes asignados) y pasa la lista YA ORDENADA (mayor riesgo →
+ * más días sin check-in) al componente cliente, que sólo filtra por nombre.
+ */
+export default async function PacientesPage() {
+  const pacientes = await listarPacientes();
+
   return (
     <div className="flex flex-col gap-8">
       <EncabezadoPagina
         titulo="Pacientes"
-        descripcion="Listado de tus pacientes asignados, con su estado y último check-in."
+        descripcion="Tus pacientes asignados, ordenados por riesgo y tiempo sin check-in."
         icono={<Users className="h-6 w-6" aria-hidden />}
       />
-
-      <section className="rounded-[var(--radius-lg)] border border-borde bg-superficie p-6">
-        <p className="text-base text-texto-suave">
-          Aún no hay pacientes que mostrar. El listado se poblará en una próxima
-          entrega.
-        </p>
-      </section>
+      <ListaPacientes pacientes={pacientes} />
     </div>
   );
 }
