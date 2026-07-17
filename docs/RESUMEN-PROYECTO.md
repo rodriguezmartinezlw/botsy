@@ -21,9 +21,9 @@
 
 **Regla de puertas** (MEMORIA §8.3): cada WP clínico se desbloquea con una conversación real del fundador (psicooncólogo → umbrales; asociación → pediatría; farma → farmacovigilancia). Los umbrales clínicos van configurables y marcados `[PENDIENTE CLÍNICO]` hasta su validación.
 
-## Estado: F1 COMPLETO, subido y verificado
+## Estado: PILOTO CONSTRUIDO Y EN VIVO (2026-07-17)
 
-Repo: **github.com/rodriguezmartinezlw/botsy** (cuenta personal del usuario). 11 commits. **113 tests en verde, RLS en 11 tablas auditada sin defectos, cero secretos en el bundle de cliente, TypeScript estricto sin `any`.** No existe aún proyecto Supabase remoto ni claves de OpenAI/Resend: todo está verificado con mocks inyectables y cada entrega documenta su prueba E2E real para cuando haya claves.
+Repo: **github.com/rodriguezmartinezlw/botsy** (cuenta personal del usuario). **216 tests en verde; 19 tablas con RLS verificada EN VIVO; las 3 caras funcionan: app del paciente, panel del profesional y dashboard del patrocinador.** La base de datos real (`hjkvmhccgorphhykoarg`) tiene las migraciones 0001–0013 + seed oncológico aplicados; `acceso_cruzado.sql` pasa en vivo (destapó 2 bugs reales que se corrigieron: 0012, 0013); la capa de IA está probada con la clave real de OpenAI. Claves en `.env.local` (falta solo Resend). Demo vendible: `DEMO_MODE=true npm run dev` + `docs/DEMO-GUION.md`. **La cola de trabajo actual está en `docs/PENDIENTE.md`** (siguiente: WP-20 UX/enrolamiento, sin puerta).
 
 **Stack:** Next.js 16 (App Router, route groups `(paciente)`/`(panel)`/`(auth)`) · Supabase (Postgres+Auth+Storage, migraciones en `supabase/migrations/0001..0004`, RLS estricta) · OpenAI (texto para extracción con Zod, Realtime para voz con token efímero server-side) · Recharts · Vitest · Vercel (previsto).
 
