@@ -21,6 +21,7 @@ import {
   fechaHoyEnZona,
   parsearDominiosCubiertos,
 } from "@/lib/ia/conversacion";
+import { moduloActivoPaciente } from "@/lib/programas/servidor";
 
 export async function POST(): Promise<Response> {
   try {
@@ -52,6 +53,14 @@ export async function POST(): Promise<Response> {
     if (!puedeConversar(estadoConsent)) {
       return respuestaError(
         "Necesitas aceptar el registro de conversaciones para hacer tu check-in.",
+        403,
+      );
+    }
+
+    // Gating server-side (WP-11 v2 §A.3): módulo de texto del programa.
+    if (!(await moduloActivoPaciente(supabase, user.id, "texto"))) {
+      return respuestaError(
+        "El check-in por texto no está disponible en tu programa.",
         403,
       );
     }

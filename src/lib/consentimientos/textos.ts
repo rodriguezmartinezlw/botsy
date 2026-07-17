@@ -121,6 +121,37 @@ export const TEXTOS_CONSENTIMIENTO: Record<
       { titulo: "Tus derechos y revocación", cuerpo: DERECHOS },
     ],
   },
+  uso_secundario: {
+    tipo: "uso_secundario",
+    titulo: "Uso secundario de datos (investigación y mejora)",
+    resumen:
+      "Permites, de forma totalmente opcional, que tus datos ya seudonimizados se usen para investigación y mejora del servicio. No afecta a tu seguimiento ni a la atención que recibes.",
+    obligatorio: false,
+    apartados: [
+      { titulo: "Responsable", cuerpo: RESPONSABLE },
+      {
+        titulo: "Finalidad",
+        cuerpo:
+          "[PENDIENTE LEGAL] Reutilizar tus datos de salud, previamente seudonimizados, para fines de investigación, generación de evidencia y mejora del servicio. Es un permiso SEPARADO y estrictamente opcional: no otorgarlo no cambia en nada tu seguimiento ni tu atención.",
+      },
+      {
+        titulo: "Base legitimadora",
+        cuerpo:
+          "[PENDIENTE LEGAL] Tu consentimiento explícito, específico y separado del resto. Ninguna funcionalidad de la app depende de él.",
+      },
+      {
+        titulo: "Conservación",
+        cuerpo:
+          "[PENDIENTE LEGAL] Los datos empleados para uso secundario se tratan seudonimizados y se conservan según la política de retención aplicable a investigación.",
+      },
+      {
+        titulo: "Efecto de la revocación",
+        cuerpo:
+          "Si retiras este permiso, tus datos dejan de incorporarse a nuevos usos secundarios a partir de ese momento. El cambio queda registrado con fecha.",
+      },
+      { titulo: "Tus derechos y revocación", cuerpo: DERECHOS },
+    ],
+  },
 };
 
 /** Lista ordenada (obligatorio primero) para renderizar. */
@@ -128,4 +159,5 @@ export const TEXTOS_ORDENADOS: TextoConsentimiento[] = [
   TEXTOS_CONSENTIMIENTO.conversacion,
   TEXTOS_CONSENTIMIENTO.voz_grabacion,
   TEXTOS_CONSENTIMIENTO.voz_biomarcadores,
+  TEXTOS_CONSENTIMIENTO.uso_secundario,
 ];

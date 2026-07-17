@@ -25,6 +25,7 @@ import {
   fechaHoyEnZona,
   toolsParaRealtime,
 } from "@/lib/ia/conversacion";
+import { moduloActivoPaciente } from "@/lib/programas/servidor";
 import { crearSesionRealtime, maxMinutosVoz } from "@/lib/ia/realtime";
 
 export async function POST(): Promise<Response> {
@@ -57,6 +58,15 @@ export async function POST(): Promise<Response> {
     if (!puedeConversar(consentimientos)) {
       return respuestaError(
         "Necesitas aceptar el registro de conversaciones para usar el modo voz.",
+        403,
+      );
+    }
+
+    // Gating server-side (WP-11 v2 §A.3): si el programa del paciente desactiva
+    // el módulo de voz, la ruta lo bloquea aunque se llame directamente.
+    if (!(await moduloActivoPaciente(supabase, user.id, "voz"))) {
+      return respuestaError(
+        "El check-in por voz no está disponible en tu programa.",
         403,
       );
     }

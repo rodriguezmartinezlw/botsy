@@ -2,7 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import CabeceraFicha from "@/components/panel/ficha/CabeceraFicha";
 import FichaPacienteTabs from "@/components/panel/ficha/FichaPacienteTabs";
-import { cargarFichaPaciente } from "@/lib/panel/datos";
+import {
+  cargarFichaPaciente,
+  cargarMotivos,
+  cargarProgramaPaciente,
+} from "@/lib/panel/datos";
 
 export const metadata: Metadata = {
   title: "Ficha del paciente",
@@ -24,11 +28,22 @@ export default async function FichaPage({
   const { id } = await params;
   const ficha = await cargarFichaPaciente(id);
   if (!ficha) notFound();
+  const [programa, motivos] = await Promise.all([
+    cargarProgramaPaciente(id),
+    cargarMotivos(),
+  ]);
+  const motivosDiscontinuacion = motivos.filter(
+    (m) => m.ambito === "discontinuacion",
+  );
 
   return (
     <div className="flex flex-col gap-6">
       <CabeceraFicha cabecera={ficha.cabecera} />
-      <FichaPacienteTabs ficha={ficha} />
+      <FichaPacienteTabs
+        ficha={ficha}
+        programa={programa}
+        motivosDiscontinuacion={motivosDiscontinuacion}
+      />
     </div>
   );
 }

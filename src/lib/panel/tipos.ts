@@ -6,9 +6,13 @@
 
 import type { PuntoAnimo, SeriePunto, DiaAdherencia } from "@/lib/agregados";
 import type {
+  AmbitoMotivo,
   CanalCheckin,
+  DecisionDisposicion,
+  DesenlaceDisposicion,
   EstadoAlerta,
   EstadoCheckin,
+  EstadoProgramaPaciente,
   Json,
   NivelEscalado,
   NivelRiesgo,
@@ -146,6 +150,25 @@ export type FichaPaciente = {
 
 export type ResultadoAccion = { ok: true } | { ok: false; error: string };
 
+// --- Disposición estructurada (WP-11 v2 §B) ----------------------------------
+
+export type MotivoCatalogo = {
+  id: string;
+  codigo: string;
+  etiqueta: string;
+  ambito: AmbitoMotivo;
+};
+
+export type DisposicionVista = {
+  id: string;
+  decision: DecisionDisposicion;
+  motivoEtiqueta: string | null;
+  motivoTexto: string | null;
+  diasSeguimiento: number;
+  desenlace: DesenlaceDisposicion;
+  creadoEn: string;
+};
+
 // --- Bandeja de alertas (detalle para la UI) ---------------------------------
 
 export type AlertaDetalle = {
@@ -161,4 +184,56 @@ export type AlertaDetalle = {
   evidencia: Json;
   creadoEn: string;
   gestionadaEn: string | null;
+  /** Disposición registrada al cerrar la alerta (WP-11 v2), o null si abierta. */
+  disposicion: DisposicionVista | null;
+};
+
+// --- Desenlaces pendientes (seguimiento vencido) -----------------------------
+
+export type DesenlacePendienteVista = {
+  disposicionId: string;
+  alertaId: string;
+  pacienteId: string;
+  pacienteNombre: string;
+  pacienteInicial: string;
+  nivel: NivelEscalado;
+  alertaMotivo: string;
+  decision: DecisionDisposicion;
+  motivoEtiqueta: string | null;
+  diasSeguimiento: number;
+  creadoEn: string;
+  /** ISO de la fecha de vencimiento del seguimiento. */
+  venceEn: string;
+};
+
+// --- Pestaña Programa de la ficha (WP-11 v2 §A.5) -----------------------------
+
+export type PlantillaProgramaVista = {
+  id: string;
+  clave: string;
+  nombre: string;
+  descripcion: string | null;
+};
+
+/** Una línea legible de la config efectiva (sin JSON crudo). */
+export type LineaConfig = { etiqueta: string; valor: string };
+
+export type OverrideModulo = {
+  clave: "voz" | "texto" | "recomendaciones";
+  etiqueta: string;
+  activo: boolean;
+};
+
+export type ProgramaPacienteVista = {
+  /** Programa activo/asignado (si hay); null si el paciente no tiene programa. */
+  asignacionId: string | null;
+  programaId: string | null;
+  programaNombre: string | null;
+  estado: EstadoProgramaPaciente | null;
+  /** Config efectiva descrita en lenguaje humano (sin JSON). */
+  resumenConfig: LineaConfig[];
+  /** Toggles de módulo (override del paciente sobre la plantilla). */
+  modulos: OverrideModulo[];
+  /** Catálogo de plantillas disponibles para asignar. */
+  plantillas: PlantillaProgramaVista[];
 };

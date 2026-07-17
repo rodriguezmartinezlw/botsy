@@ -6,12 +6,14 @@ const ETIQUETA: Record<TipoConsentimiento, string> = {
   conversacion: "Conversaciones",
   voz_grabacion: "Grabación de voz",
   voz_biomarcadores: "Biomarcadores de voz",
+  uso_secundario: "Uso secundario (investigación)",
 };
 
 const ORDEN: TipoConsentimiento[] = [
   "conversacion",
   "voz_grabacion",
   "voz_biomarcadores",
+  "uso_secundario",
 ];
 
 /**

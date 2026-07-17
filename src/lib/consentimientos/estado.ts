@@ -18,6 +18,7 @@ export const TIPOS_CONSENTIMIENTO: readonly TipoConsentimiento[] = [
   "conversacion",
   "voz_grabacion",
   "voz_biomarcadores",
+  "uso_secundario",
 ] as const;
 
 /** Estado vigente (otorgado/no) por tipo. */
@@ -36,6 +37,7 @@ export function estadoVacio(): EstadoConsentimientos {
     conversacion: false,
     voz_grabacion: false,
     voz_biomarcadores: false,
+    uso_secundario: false,
   };
 }
 

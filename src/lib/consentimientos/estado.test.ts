@@ -26,6 +26,8 @@ describe("estadoVigenteConsentimientos", () => {
       conversacion: false,
       voz_grabacion: false,
       voz_biomarcadores: false,
+      // uso_secundario añadido en WP-11 v2 §D (opt-in separado y opcional).
+      uso_secundario: false,
     });
   });
 

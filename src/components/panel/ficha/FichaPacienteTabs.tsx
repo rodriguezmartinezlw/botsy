@@ -1,22 +1,36 @@
 "use client";
 
 import { useState } from "react";
-import type { FichaPaciente } from "@/lib/panel/tipos";
+import type {
+  FichaPaciente,
+  MotivoCatalogo,
+  ProgramaPacienteVista,
+} from "@/lib/panel/tipos";
 import LineaTemporal from "./LineaTemporal";
 import ColumnaTendencias from "./ColumnaTendencias";
 import ConsentimientosVigentes from "./ConsentimientosVigentes";
 import PanelMedicacion from "./PanelMedicacion";
 import PanelReglas from "./PanelReglas";
+import PanelPrograma from "./PanelPrograma";
 
-type Pestana = "resumen" | "medicacion" | "reglas";
+type Pestana = "resumen" | "programa" | "medicacion" | "reglas";
 
 const PESTANAS: { id: Pestana; etiqueta: string }[] = [
   { id: "resumen", etiqueta: "Resumen" },
+  { id: "programa", etiqueta: "Programa" },
   { id: "medicacion", etiqueta: "Medicación" },
   { id: "reglas", etiqueta: "Reglas" },
 ];
 
-export default function FichaPacienteTabs({ ficha }: { ficha: FichaPaciente }) {
+export default function FichaPacienteTabs({
+  ficha,
+  programa,
+  motivosDiscontinuacion,
+}: {
+  ficha: FichaPaciente;
+  programa: ProgramaPacienteVista;
+  motivosDiscontinuacion: MotivoCatalogo[];
+}) {
   const [pestana, setPestana] = useState<Pestana>("resumen");
 
   return (
@@ -61,8 +75,16 @@ export default function FichaPacienteTabs({ ficha }: { ficha: FichaPaciente }) {
         </div>
       ) : null}
 
+      {pestana === "programa" ? (
+        <PanelPrograma pacienteId={ficha.cabecera.id} programa={programa} />
+      ) : null}
+
       {pestana === "medicacion" ? (
-        <PanelMedicacion pacienteId={ficha.cabecera.id} pautas={ficha.pautas} />
+        <PanelMedicacion
+          pacienteId={ficha.cabecera.id}
+          pautas={ficha.pautas}
+          motivosDiscontinuacion={motivosDiscontinuacion}
+        />
       ) : null}
 
       {pestana === "reglas" ? (

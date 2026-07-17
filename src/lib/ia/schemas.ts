@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { rangoValorNum, esCodigoCelsius } from "./vocabulario-onco";
 
 // --- Vocabularios (espejo de los checks del SQL / dominios de checklist) -----
 
@@ -52,17 +53,40 @@ const codigoClinico = z
     "El código debe ir en snake_case ascii (solo minúsculas, dígitos y guion bajo).",
   );
 
+// --- Rango de valor_num dependiente del código -------------------------------
+// La mayoría de códigos usan la escala clínica 0–10 (F1). Los códigos en °C
+// (fiebre / temperatura, WP-11 v2 §C.2) usan 34–43. Se valida por código para
+// que ambas escalas CONVIVAN en la misma columna `observaciones.valor_num` sin
+// ampliar el rango de todo lo demás (un dolor "38" seguiría siendo inválido).
+function validarValorNumPorCodigo(
+  val: { codigo: string; valor_num?: number },
+  ctx: z.RefinementCtx,
+): void {
+  if (val.valor_num === undefined || val.valor_num === null) return;
+  const { min, max } = rangoValorNum(val.codigo);
+  if (val.valor_num < min || val.valor_num > max) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["valor_num"],
+      message: esCodigoCelsius(val.codigo)
+        ? `La temperatura debe ir en grados Celsius, entre ${min} y ${max}.`
+        : `El valor debe estar entre ${min} y ${max} (escala clínica).`,
+    });
+  }
+}
+
 // --- Argumentos de tools (validados antes de persistir) ---------------------
 
 export const esquemaRegistrarObservacion = z
   .object({
     dominio: z.enum(DOMINIOS_OBSERVACION),
     codigo: codigoClinico,
-    valor_num: z.number().min(0).max(10).optional(),
+    valor_num: z.number().optional(),
     valor_texto: z.string().min(1).max(500).optional(),
     confianza: z.number().min(0).max(1),
   })
-  .strict();
+  .strict()
+  .superRefine(validarValorNumPorCodigo);
 
 export const esquemaRegistrarToma = z
   .object({
@@ -100,13 +124,20 @@ export type ArgsFinalizarCheckin = z.infer<typeof esquemaFinalizarCheckin>;
 
 // --- Reconciliación (segunda pasada estructurada sobre el transcript) --------
 
-export const esquemaObservacionExtraida = z.object({
-  dominio: z.enum(DOMINIOS_OBSERVACION),
-  codigo: codigoClinico,
-  valor_num: z.number().min(0).max(10).nullish(),
-  valor_texto: z.string().min(1).max(500).nullish(),
-  confianza: z.number().min(0).max(1),
-});
+export const esquemaObservacionExtraida = z
+  .object({
+    dominio: z.enum(DOMINIOS_OBSERVACION),
+    codigo: codigoClinico,
+    valor_num: z.number().nullish(),
+    valor_texto: z.string().min(1).max(500).nullish(),
+    confianza: z.number().min(0).max(1),
+  })
+  .superRefine((val, ctx) =>
+    validarValorNumPorCodigo(
+      { codigo: val.codigo, valor_num: val.valor_num ?? undefined },
+      ctx,
+    ),
+  );
 
 export const esquemaLoteExtraccion = z
   .object({

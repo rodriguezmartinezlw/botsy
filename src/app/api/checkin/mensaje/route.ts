@@ -21,6 +21,7 @@ import {
 import { ejecutarTurno } from "@/lib/ia/loop";
 import { crearRepositorioSupabase } from "@/lib/ia/repositorio-supabase";
 import { cargarReglasSenal, evaluarCheckin } from "@/lib/escalado/motor";
+import { moduloActivoPaciente } from "@/lib/programas/servidor";
 import {
   aplicarEscalado,
   aplicarEscaladoSenalGenerica,
@@ -59,6 +60,14 @@ export async function POST(request: Request): Promise<Response> {
     if (!checkin) return respuestaError("Check-in no encontrado.", 404);
     if (checkin.estado !== "en_curso") {
       return respuestaError("Este check-in ya está cerrado.", 409);
+    }
+
+    // Gating server-side (WP-11 v2 §A.3): módulo de texto del programa.
+    if (!(await moduloActivoPaciente(supabase, user.id, "texto"))) {
+      return respuestaError(
+        "El check-in por texto no está disponible en tu programa.",
+        403,
+      );
     }
 
     // Siguiente número de orden.

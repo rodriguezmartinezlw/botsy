@@ -5,9 +5,14 @@ import { Pill, Plus } from "lucide-react";
 import {
   altaPauta,
   cambiarEstadoPauta,
+  discontinuarPauta,
   editarPauta,
 } from "@/app/(panel)/pacientes/[id]/acciones";
-import type { PautaVista, ResultadoAccion } from "@/lib/panel/tipos";
+import type {
+  MotivoCatalogo,
+  PautaVista,
+  ResultadoAccion,
+} from "@/lib/panel/tipos";
 
 const MOMENTOS = ["mañana", "mediodía", "tarde", "noche"] as const;
 
@@ -138,11 +143,15 @@ function FormularioPauta({
 function TarjetaPauta({
   pauta,
   pacienteId,
+  motivosDiscontinuacion,
 }: {
   pauta: PautaVista;
   pacienteId: string;
+  motivosDiscontinuacion: MotivoCatalogo[];
 }) {
   const [editando, setEditando] = useState(false);
+  const [discontinuando, setDiscontinuando] = useState(false);
+  const [motivoSel, setMotivoSel] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
 
@@ -197,7 +206,7 @@ function TarjetaPauta({
             {pauta.momentos.join(", ")}
           </span>
         </div>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setEditando(true)}
@@ -216,10 +225,60 @@ function TarjetaPauta({
             disabled={enviando}
             className="rounded-[var(--radius-sm)] border border-borde px-3 py-1.5 text-sm font-semibold text-texto-suave hover:bg-superficie-suave"
           >
-            {pauta.activa ? "Desactivar" : "Reactivar"}
+            {pauta.activa ? "Desactivar (error)" : "Reactivar"}
           </button>
+          {pauta.activa ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDiscontinuando((v) => !v);
+                setError(null);
+              }}
+              disabled={enviando}
+              className="rounded-[var(--radius-sm)] border border-borde px-3 py-1.5 text-sm font-semibold text-texto-suave hover:bg-superficie-suave"
+            >
+              Discontinuar…
+            </button>
+          ) : null}
         </div>
       </div>
+
+      {discontinuando ? (
+        <div className="flex flex-wrap items-end gap-2 rounded-[var(--radius-md)] bg-superficie-suave p-3">
+          <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+            Motivo de discontinuación
+            <select
+              value={motivoSel}
+              onChange={(e) => setMotivoSel(e.target.value)}
+              className="rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
+            >
+              <option value="">— Selecciona un motivo —</option>
+              {motivosDiscontinuacion.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.etiqueta}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            type="button"
+            disabled={enviando || !motivoSel}
+            onClick={() =>
+              manejar(
+                discontinuarPauta({
+                  pacienteId,
+                  pautaId: pauta.id,
+                  motivoId: motivoSel,
+                }),
+                () => setDiscontinuando(false),
+              )
+            }
+            className="rounded-[var(--radius-md)] bg-primario px-4 py-2 text-base font-semibold text-white hover:bg-primario-fuerte disabled:opacity-60"
+          >
+            Confirmar discontinuación
+          </button>
+        </div>
+      ) : null}
       {error ? <p className="text-sm text-[#b91c1c]">{error}</p> : null}
     </div>
   );
@@ -228,9 +287,11 @@ function TarjetaPauta({
 export default function PanelMedicacion({
   pacienteId,
   pautas,
+  motivosDiscontinuacion,
 }: {
   pacienteId: string;
   pautas: PautaVista[];
+  motivosDiscontinuacion: MotivoCatalogo[];
 }) {
   const [creando, setCreando] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -287,7 +348,12 @@ export default function PanelMedicacion({
           </p>
         ) : (
           activas.map((p) => (
-            <TarjetaPauta key={p.id} pauta={p} pacienteId={pacienteId} />
+            <TarjetaPauta
+              key={p.id}
+              pauta={p}
+              pacienteId={pacienteId}
+              motivosDiscontinuacion={motivosDiscontinuacion}
+            />
           ))
         )}
       </div>
@@ -296,7 +362,12 @@ export default function PanelMedicacion({
         <div className="flex flex-col gap-3">
           <h3 className="text-base font-semibold text-texto-suave">Histórico</h3>
           {historicas.map((p) => (
-            <TarjetaPauta key={p.id} pauta={p} pacienteId={pacienteId} />
+            <TarjetaPauta
+              key={p.id}
+              pauta={p}
+              pacienteId={pacienteId}
+              motivosDiscontinuacion={motivosDiscontinuacion}
+            />
           ))}
         </div>
       ) : null}

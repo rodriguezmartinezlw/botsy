@@ -30,6 +30,12 @@ import {
 } from "@/lib/agregados";
 import { describirCondicion } from "./reglas-plantillas";
 import {
+  filtrarDesenlacesPendientes,
+  fechaVencimiento,
+} from "@/lib/disposiciones/nucleo";
+import { configEfectiva } from "@/lib/programas/config";
+import { describirConfig } from "@/lib/programas/describir";
+import {
   calcularEdad,
   diasSinCheckin,
   nivelSemaforo,
@@ -38,9 +44,13 @@ import {
 } from "./lista";
 import type {
   AlertaDetalle,
+  DesenlacePendienteVista,
+  DisposicionVista,
   FichaPaciente,
   ItemTimeline,
+  MotivoCatalogo,
   PautaVista,
+  ProgramaPacienteVista,
   ReglaVista,
   TendenciasCompactas,
 } from "./tipos";
@@ -488,11 +498,36 @@ export async function cargarAlertasBandeja(): Promise<AlertaDetalle[]> {
     if (!alertas || alertas.length === 0) return [];
 
     const ids = [...new Set(alertas.map((a) => a.paciente_id))];
-    const { data: perfiles } = await supabase
-      .from("perfiles")
-      .select("id, nombre")
-      .in("id", ids);
+    const alertaIds = alertas.map((a) => a.id);
+    const [{ data: perfiles }, { data: disposiciones }, { data: motivos }] =
+      await Promise.all([
+        supabase.from("perfiles").select("id, nombre").in("id", ids),
+        supabase
+          .from("disposiciones")
+          .select(
+            "id, alerta_id, decision, motivo_codigo, motivo_texto, dias_seguimiento, desenlace, creado_en",
+          )
+          .in("alerta_id", alertaIds),
+        supabase.from("catalogo_motivos").select("id, etiqueta"),
+      ]);
     const nombrePorId = new Map((perfiles ?? []).map((p) => [p.id, p.nombre]));
+    const etiquetaMotivo = new Map(
+      (motivos ?? []).map((m) => [m.id, m.etiqueta]),
+    );
+    const disposicionPorAlerta = new Map<string, DisposicionVista>();
+    for (const d of disposiciones ?? []) {
+      disposicionPorAlerta.set(d.alerta_id, {
+        id: d.id,
+        decision: d.decision,
+        motivoEtiqueta: d.motivo_codigo
+          ? etiquetaMotivo.get(d.motivo_codigo) ?? null
+          : null,
+        motivoTexto: d.motivo_texto,
+        diasSeguimiento: d.dias_seguimiento,
+        desenlace: d.desenlace,
+        creadoEn: d.creado_en,
+      });
+    }
 
     return alertas.map((a) => {
       const nombre = nombrePorId.get(a.paciente_id) ?? "Paciente";
@@ -509,10 +544,238 @@ export async function cargarAlertasBandeja(): Promise<AlertaDetalle[]> {
         evidencia: a.evidencia,
         creadoEn: a.creado_en,
         gestionadaEn: a.gestionada_en,
+        disposicion: disposicionPorAlerta.get(a.id) ?? null,
       };
     });
   } catch {
     return [];
+  }
+}
+
+// =====================================================================
+// Catálogo de motivos + desenlaces pendientes (WP-11 v2 §B).
+// =====================================================================
+
+/** Motivos del catálogo (para los selects de la disposición). */
+export async function cargarMotivos(): Promise<MotivoCatalogo[]> {
+  try {
+    const supabase = await crearClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from("catalogo_motivos")
+      .select("id, codigo, etiqueta, ambito")
+      .eq("activo", true)
+      .order("ambito", { ascending: true })
+      .order("etiqueta", { ascending: true });
+    return (data ?? []).map((m) => ({
+      id: m.id,
+      codigo: m.codigo,
+      etiqueta: m.etiqueta,
+      ambito: m.ambito,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Disposiciones con seguimiento VENCIDO y desenlace 'pendiente' (WP-11 v2 §B.3),
+ * ordenadas por vencimiento ascendente (lo más atrasado primero).
+ */
+export async function cargarDesenlacesPendientes(): Promise<
+  DesenlacePendienteVista[]
+> {
+  try {
+    const supabase = await crearClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+
+    // RLS: sólo disposiciones de alertas de sus pacientes.
+    const { data: disposiciones } = await supabase
+      .from("disposiciones")
+      .select(
+        "id, alerta_id, decision, motivo_codigo, dias_seguimiento, desenlace, creado_en",
+      )
+      .eq("desenlace", "pendiente")
+      .limit(500);
+    if (!disposiciones || disposiciones.length === 0) return [];
+
+    const hoyISO = new Date().toISOString();
+    const vencidas = filtrarDesenlacesPendientes(
+      disposiciones.map((d) => ({
+        id: d.id,
+        diasSeguimiento: d.dias_seguimiento,
+        desenlace: d.desenlace,
+        creadoEn: d.creado_en,
+      })),
+      hoyISO,
+    );
+    if (vencidas.length === 0) return [];
+    const vencidaIds = new Set(vencidas.map((v) => v.id));
+    const porId = new Map(disposiciones.map((d) => [d.id, d]));
+
+    const alertaIds = [
+      ...new Set(
+        [...vencidaIds].map((id) => porId.get(id)!.alerta_id),
+      ),
+    ];
+    const { data: alertas } = await supabase
+      .from("alertas")
+      .select("id, paciente_id, nivel, motivo")
+      .in("id", alertaIds);
+    const alertaPorId = new Map((alertas ?? []).map((a) => [a.id, a]));
+
+    const pacienteIds = [
+      ...new Set((alertas ?? []).map((a) => a.paciente_id)),
+    ];
+    const [{ data: perfiles }, { data: motivos }] = await Promise.all([
+      supabase.from("perfiles").select("id, nombre").in("id", pacienteIds),
+      supabase.from("catalogo_motivos").select("id, etiqueta"),
+    ]);
+    const nombrePorId = new Map((perfiles ?? []).map((p) => [p.id, p.nombre]));
+    const etiquetaMotivo = new Map(
+      (motivos ?? []).map((m) => [m.id, m.etiqueta]),
+    );
+
+    const resultado: DesenlacePendienteVista[] = [];
+    for (const v of vencidas) {
+      const disp = porId.get(v.id);
+      if (!disp) continue;
+      const alerta = alertaPorId.get(disp.alerta_id);
+      if (!alerta) continue; // RLS: no es de sus pacientes.
+      const nombre = nombrePorId.get(alerta.paciente_id) ?? "Paciente";
+      resultado.push({
+        disposicionId: disp.id,
+        alertaId: disp.alerta_id,
+        pacienteId: alerta.paciente_id,
+        pacienteNombre: nombre,
+        pacienteInicial: inicialDe(nombre),
+        nivel: alerta.nivel,
+        alertaMotivo: alerta.motivo,
+        decision: disp.decision,
+        motivoEtiqueta: disp.motivo_codigo
+          ? etiquetaMotivo.get(disp.motivo_codigo) ?? null
+          : null,
+        diasSeguimiento: disp.dias_seguimiento,
+        creadoEn: disp.creado_en,
+        venceEn: fechaVencimiento({
+          id: disp.id,
+          diasSeguimiento: disp.dias_seguimiento,
+          desenlace: disp.desenlace,
+          creadoEn: disp.creado_en,
+        }).toISOString(),
+      });
+    }
+    return resultado;
+  } catch {
+    return [];
+  }
+}
+
+/** Recuento para el badge de "Desenlaces pendientes" en la navegación. */
+export async function contarDesenlacesPendientes(): Promise<number> {
+  return (await cargarDesenlacesPendientes()).length;
+}
+
+// =====================================================================
+// Pestaña Programa de la ficha (WP-11 v2 §A.5).
+// =====================================================================
+
+const ETIQUETA_MODULO: Record<"voz" | "texto" | "recomendaciones", string> = {
+  texto: "Check-in por texto",
+  voz: "Check-in por voz",
+  recomendaciones: "Recomendaciones del día",
+};
+
+/**
+ * Estado del programa del paciente para la pestaña "Programa": asignación actual
+ * (activa o suspendida), su config efectiva en lenguaje humano, los toggles de
+ * módulo y el catálogo de plantillas para asignar. Nunca lanza.
+ */
+export async function cargarProgramaPaciente(
+  pacienteId: string,
+): Promise<ProgramaPacienteVista> {
+  const vacio: ProgramaPacienteVista = {
+    asignacionId: null,
+    programaId: null,
+    programaNombre: null,
+    estado: null,
+    resumenConfig: [],
+    modulos: [],
+    plantillas: [],
+  };
+  try {
+    const supabase = await crearClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return vacio;
+
+    // Confirma acceso al paciente (RLS: profesional asignado / admin).
+    const { data: paciente } = await supabase
+      .from("pacientes")
+      .select("id")
+      .eq("id", pacienteId)
+      .maybeSingle();
+    if (!paciente) return vacio;
+
+    // Catálogo de plantillas disponibles.
+    const { data: catalogo } = await supabase
+      .from("programas")
+      .select("id, clave, nombre, descripcion")
+      .eq("activo", true)
+      .order("nombre", { ascending: true });
+    const plantillas = (catalogo ?? []).map((p) => ({
+      id: p.id,
+      clave: p.clave,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+    }));
+
+    // Asignación más reciente (activa o suspendida) del paciente.
+    const { data: asignacion } = await supabase
+      .from("programas_paciente")
+      .select("id, programa_id, config_override, estado")
+      .eq("paciente_id", pacienteId)
+      .order("creado_en", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!asignacion) {
+      return { ...vacio, plantillas };
+    }
+
+    const { data: programa } = await supabase
+      .from("programas")
+      .select("nombre, config")
+      .eq("id", asignacion.programa_id)
+      .maybeSingle();
+
+    const { config } = configEfectiva(
+      programa?.config ?? {},
+      asignacion.config_override,
+    );
+
+    return {
+      asignacionId: asignacion.id,
+      programaId: asignacion.programa_id,
+      programaNombre: programa?.nombre ?? null,
+      estado: asignacion.estado,
+      resumenConfig: describirConfig(config),
+      modulos: (["texto", "voz", "recomendaciones"] as const).map((clave) => ({
+        clave,
+        etiqueta: ETIQUETA_MODULO[clave],
+        activo: config.modulos[clave],
+      })),
+      plantillas,
+    };
+  } catch {
+    return vacio;
   }
 }
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Bell } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import BandejaAlertas from "@/components/panel/BandejaAlertas";
-import { cargarAlertasBandeja } from "@/lib/panel/datos";
+import { cargarAlertasBandeja, cargarMotivos } from "@/lib/panel/datos";
 
 export const metadata: Metadata = {
   title: "Alertas",
@@ -16,7 +16,10 @@ export const metadata: Metadata = {
  * vigilancia, luego por fecha), filtra y gestiona (vista/resuelta/descartada).
  */
 export default async function AlertasPage() {
-  const alertas = await cargarAlertasBandeja();
+  const [alertas, motivos] = await Promise.all([
+    cargarAlertasBandeja(),
+    cargarMotivos(),
+  ]);
   const nuevas = alertas.filter((a) => a.estado === "nueva").length;
 
   return (
@@ -26,7 +29,7 @@ export default async function AlertasPage() {
         descripcion="Señales detectadas en los check-ins, priorizadas por nivel de escalado."
         icono={<Bell className="h-6 w-6" aria-hidden />}
       />
-      <BandejaAlertas alertas={alertas} />
+      <BandejaAlertas alertas={alertas} motivos={motivos} />
     </div>
   );
 }

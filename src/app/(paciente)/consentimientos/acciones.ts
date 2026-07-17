@@ -9,7 +9,12 @@ import {
 } from "./constantes";
 
 const esquemaConsentimiento = z.object({
-  tipo: z.enum(["conversacion", "voz_grabacion", "voz_biomarcadores"]),
+  tipo: z.enum([
+    "conversacion",
+    "voz_grabacion",
+    "voz_biomarcadores",
+    "uso_secundario",
+  ]),
   otorgado: z.boolean(),
 });
 

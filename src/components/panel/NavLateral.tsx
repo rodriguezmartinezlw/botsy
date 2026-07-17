@@ -2,26 +2,33 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Bell, Settings, HeartPulse } from "lucide-react";
+import { Users, Bell, Settings, HeartPulse, ClipboardCheck } from "lucide-react";
 
 const items = [
   { href: "/pacientes", label: "Pacientes", Icono: Users },
   { href: "/alertas", label: "Alertas", Icono: Bell },
+  { href: "/desenlaces", label: "Desenlaces", Icono: ClipboardCheck },
   { href: "/configuracion", label: "Configuración", Icono: Settings },
 ] as const;
 
 /**
  * Navegación del panel profesional.
  * Responsive: sidebar fija en escritorio (md+), barra superior en móvil.
- * Cliente: resalta el ítem activo según la ruta y muestra el nº de alertas
- * nuevas (badge) en el ítem de Alertas (WP-06).
+ * Cliente: resalta el ítem activo según la ruta y muestra badges con el nº de
+ * alertas nuevas (WP-06) y de desenlaces pendientes de registrar (WP-11 v2).
  */
 export default function NavLateral({
   alertasNuevas = 0,
+  desenlacesPendientes = 0,
 }: {
   alertasNuevas?: number;
+  desenlacesPendientes?: number;
 }) {
   const pathname = usePathname();
+  const badgePorHref: Record<string, number> = {
+    "/alertas": alertasNuevas,
+    "/desenlaces": desenlacesPendientes,
+  };
 
   return (
     <nav
@@ -55,12 +62,12 @@ export default function NavLateral({
               >
                 <Icono className="h-5 w-5" aria-hidden />
                 <span className="flex-1">{label}</span>
-                {href === "/alertas" && alertasNuevas > 0 ? (
+                {(badgePorHref[href] ?? 0) > 0 ? (
                   <span
                     className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#dc2626] px-1.5 text-xs font-bold text-white"
-                    aria-label={`${alertasNuevas} alertas nuevas`}
+                    aria-label={`${badgePorHref[href]} pendientes`}
                   >
-                    {alertasNuevas > 99 ? "99+" : alertasNuevas}
+                    {badgePorHref[href] > 99 ? "99+" : badgePorHref[href]}
                   </span>
                 ) : null}
               </Link>

@@ -160,6 +160,66 @@ export async function cambiarEstadoPauta(entrada: unknown): Promise<ResultadoAcc
   return { ok: true };
 }
 
+// --- Discontinuación codificada (WP-11 v2 §C.4) ------------------------------
+
+const esquemaDiscontinuar = z
+  .object({
+    pacienteId: z.string().uuid(),
+    pautaId: z.string().uuid(),
+    motivoId: z.string().uuid(),
+  })
+  .strict();
+
+/**
+ * Discontinúa una pauta con un motivo CODIFICADO del catálogo (ámbito
+ * 'discontinuacion'), distinto de "desactivar por error". Fecha la baja
+ * (`desactivada_en`) y guarda `motivo_discontinuacion` (alimenta las curvas de
+ * persistencia, WP-17).
+ */
+export async function discontinuarPauta(
+  entrada: unknown,
+): Promise<ResultadoAccion> {
+  const analizado = esquemaDiscontinuar.safeParse(entrada);
+  if (!analizado.success) return { ok: false, error: "Datos no válidos." };
+  const p = analizado.data;
+
+  const sesion = await obtenerSesionPanel();
+  if (!sesion) return { ok: false, error: FALLO_SESION };
+
+  // El motivo debe existir, estar activo y ser de discontinuación.
+  const { data: motivo } = await sesion.supabase
+    .from("catalogo_motivos")
+    .select("id, ambito, activo")
+    .eq("id", p.motivoId)
+    .maybeSingle();
+  if (!motivo || motivo.activo === false || motivo.ambito !== "discontinuacion") {
+    return { ok: false, error: "El motivo de discontinuación no es válido." };
+  }
+
+  const { error } = await sesion.supabase
+    .from("pautas_medicacion")
+    .update({
+      activa: false,
+      desactivada_en: new Date().toISOString(),
+      motivo_discontinuacion: p.motivoId,
+    })
+    .eq("id", p.pautaId)
+    .eq("paciente_id", p.pacienteId);
+  if (error) return { ok: false, error: FALLO_ESCRITURA };
+
+  await registrarAuditoria(
+    sesion.supabase,
+    sesion.userId,
+    "pauta_discontinuada",
+    "pautas_medicacion",
+    p.pautaId,
+    { paciente_id: p.pacienteId, motivo_discontinuacion: p.motivoId },
+  );
+
+  revalidatePath(`/pacientes/${p.pacienteId}`);
+  return { ok: true };
+}
+
 // --- Reglas (desde plantillas amigables → JSONB de WP-04) --------------------
 
 const esquemaCrearRegla = z

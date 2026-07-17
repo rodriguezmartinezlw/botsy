@@ -29,6 +29,7 @@ const ETIQUETA_CONSENT: Record<TipoConsentimiento, string> = {
   conversacion: "Registro de conversaciones",
   voz_grabacion: "Grabación de voz",
   voz_biomarcadores: "Biomarcadores de voz",
+  uso_secundario: "Uso secundario (investigación)",
 };
 
 function fechaLarga(iso: string): string {

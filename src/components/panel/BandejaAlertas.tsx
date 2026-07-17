@@ -15,8 +15,17 @@ import {
   ordenarBandeja,
   type FiltrosBandeja,
 } from "@/lib/panel/bandeja";
-import type { EstadoAlerta, NivelEscalado } from "@/types/db";
-import type { AlertaDetalle, ResultadoAccion } from "@/lib/panel/tipos";
+import {
+  DECISIONES_DISPOSICION,
+  ETIQUETA_DECISION,
+  ETIQUETA_DESENLACE,
+} from "@/lib/disposiciones/nucleo";
+import type { AmbitoMotivo, EstadoAlerta, NivelEscalado } from "@/types/db";
+import type {
+  AlertaDetalle,
+  MotivoCatalogo,
+  ResultadoAccion,
+} from "@/lib/panel/tipos";
 import BadgeNivel from "./BadgeNivel";
 import EvidenciaAlerta from "./EvidenciaAlerta";
 
@@ -35,10 +44,145 @@ function fechaHora(ts: string): string {
   }
 }
 
-function TarjetaAlerta({ alerta }: { alerta: AlertaDetalle }) {
+/** Formulario de disposición estructurada obligatoria (WP-11 v2 §B). */
+function FormularioDisposicion({
+  modo,
+  motivos,
+  enviando,
+  onConfirmar,
+  onCancelar,
+}: {
+  modo: "resolver" | "descartar";
+  motivos: MotivoCatalogo[];
+  enviando: boolean;
+  onConfirmar: (d: {
+    decision: string;
+    motivoCodigo: string;
+    diasSeguimiento: number;
+    motivoTexto?: string;
+  }) => void;
+  onCancelar: () => void;
+}) {
+  const ambito: AmbitoMotivo = modo === "resolver" ? "disposicion" : "descarte";
+  const motivosAmbito = motivos.filter((m) => m.ambito === ambito);
+
+  const [decision, setDecision] = useState<string>(
+    modo === "descartar" ? "sin_accion_justificada" : "contactado_paciente",
+  );
+  const [motivoCodigo, setMotivoCodigo] = useState<string>("");
+  const [dias, setDias] = useState<number>(7);
+  const [nota, setNota] = useState("");
+  const [errorLocal, setErrorLocal] = useState<string | null>(null);
+
+  function confirmar() {
+    if (!motivoCodigo) {
+      setErrorLocal("Selecciona un motivo del catálogo.");
+      return;
+    }
+    setErrorLocal(null);
+    onConfirmar({
+      decision,
+      motivoCodigo,
+      diasSeguimiento: dias,
+      motivoTexto: nota.trim().length > 0 ? nota.trim() : undefined,
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-[var(--radius-md)] bg-superficie-suave p-3">
+      <p className="text-sm font-semibold text-texto">
+        {modo === "resolver"
+          ? "Resolver con disposición"
+          : "Descartar con disposición"}
+      </p>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+        Decisión
+        <select
+          value={decision}
+          onChange={(e) => setDecision(e.target.value)}
+          className="rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
+        >
+          {DECISIONES_DISPOSICION.map((d) => (
+            <option key={d} value={d}>
+              {ETIQUETA_DECISION[d]}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+        Motivo (catálogo)
+        <select
+          value={motivoCodigo}
+          onChange={(e) => setMotivoCodigo(e.target.value)}
+          className="rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
+        >
+          <option value="">— Selecciona un motivo —</option>
+          {motivosAmbito.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.etiqueta}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+        Programar seguimiento (días)
+        <input
+          type="number"
+          min={0}
+          max={365}
+          value={dias}
+          onChange={(e) => setDias(Math.max(0, Number(e.target.value) || 0))}
+          className="w-28 rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
+        />
+      </label>
+
+      <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+        Nota (opcional)
+        <textarea
+          value={nota}
+          onChange={(e) => setNota(e.target.value)}
+          rows={2}
+          className="w-full rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
+          placeholder="Detalle libre del seguimiento (opcional)."
+        />
+      </label>
+
+      {errorLocal ? <p className="text-sm text-[#b91c1c]">{errorLocal}</p> : null}
+
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={confirmar}
+          className="rounded-[var(--radius-md)] bg-primario px-4 py-2 text-base font-semibold text-white hover:bg-primario-fuerte disabled:opacity-60"
+        >
+          {enviando ? "Guardando…" : "Confirmar disposición"}
+        </button>
+        <button
+          type="button"
+          disabled={enviando}
+          onClick={onCancelar}
+          className="rounded-[var(--radius-md)] border border-borde px-4 py-2 text-base font-semibold text-texto-suave hover:bg-superficie"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function TarjetaAlerta({
+  alerta,
+  motivos,
+}: {
+  alerta: AlertaDetalle;
+  motivos: MotivoCatalogo[];
+}) {
   const [abierto, setAbierto] = useState(false);
   const [modo, setModo] = useState<null | "resolver" | "descartar">(null);
-  const [texto, setTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [enviando, iniciar] = useTransition();
 
@@ -47,10 +191,7 @@ function TarjetaAlerta({ alerta }: { alerta: AlertaDetalle }) {
     iniciar(async () => {
       const r = await promesa;
       if (!r.ok) setError(r.error);
-      else {
-        setModo(null);
-        setTexto("");
-      }
+      else setModo(null);
     });
   }
 
@@ -63,7 +204,9 @@ function TarjetaAlerta({ alerta }: { alerta: AlertaDetalle }) {
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <BadgeNivel nivel={alerta.nivel} />
-            <span className="text-base font-semibold text-texto">{alerta.motivo}</span>
+            <span className="text-base font-semibold text-texto">
+              {alerta.motivo}
+            </span>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-texto-suave">
             <span className="inline-flex items-center gap-1.5">
@@ -108,11 +251,26 @@ function TarjetaAlerta({ alerta }: { alerta: AlertaDetalle }) {
         </div>
       ) : null}
 
-      {alerta.estado === "descartada" && alerta.motivoDescarte ? (
-        <p className="text-sm text-texto-suave">
-          <span className="font-semibold">Motivo del descarte:</span>{" "}
-          {alerta.motivoDescarte}
-        </p>
+      {/* Disposición registrada (alerta ya cerrada) */}
+      {gestionada && alerta.disposicion ? (
+        <div className="rounded-[var(--radius-md)] border border-borde bg-superficie-suave p-3 text-sm text-texto-suave">
+          <p>
+            <span className="font-semibold text-texto">Disposición:</span>{" "}
+            {ETIQUETA_DECISION[alerta.disposicion.decision]}
+            {alerta.disposicion.motivoEtiqueta
+              ? ` · ${alerta.disposicion.motivoEtiqueta}`
+              : ""}
+          </p>
+          <p>
+            <span className="font-semibold text-texto">Seguimiento:</span>{" "}
+            {alerta.disposicion.diasSeguimiento} día(s) ·{" "}
+            <span className="font-semibold text-texto">Desenlace:</span>{" "}
+            {ETIQUETA_DESENLACE[alerta.disposicion.desenlace]}
+          </p>
+          {alerta.disposicion.motivoTexto ? (
+            <p className="mt-1">{alerta.disposicion.motivoTexto}</p>
+          ) : null}
+        </div>
       ) : null}
 
       {!gestionada ? (
@@ -155,52 +313,22 @@ function TarjetaAlerta({ alerta }: { alerta: AlertaDetalle }) {
               </button>
             </div>
           ) : (
-            <div className="flex flex-col gap-2 rounded-[var(--radius-md)] bg-superficie-suave p-3">
-              <label className="text-sm font-medium text-texto-suave">
-                {modo === "resolver"
-                  ? "Nota (opcional)"
-                  : "Motivo del descarte (obligatorio)"}
-                <textarea
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  rows={2}
-                  className="mt-1 w-full rounded-[var(--radius-sm)] border border-borde bg-superficie px-3 py-2 text-base text-texto focus:border-primario focus:outline-none"
-                  placeholder={
-                    modo === "resolver"
-                      ? "Ej.: hablado con el paciente, ajustada la pauta."
-                      : "Ej.: falso positivo, el paciente lo confirmó."
-                  }
-                />
-              </label>
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={enviando}
-                  onClick={() =>
-                    ejecutar(
-                      modo === "resolver"
-                        ? resolverAlerta({ alertaId: alerta.id, nota: texto })
-                        : descartarAlerta({ alertaId: alerta.id, motivo: texto }),
-                    )
-                  }
-                  className="rounded-[var(--radius-md)] bg-primario px-4 py-2 text-base font-semibold text-white hover:bg-primario-fuerte disabled:opacity-60"
-                >
-                  {enviando ? "Guardando…" : "Confirmar"}
-                </button>
-                <button
-                  type="button"
-                  disabled={enviando}
-                  onClick={() => {
-                    setModo(null);
-                    setTexto("");
-                    setError(null);
-                  }}
-                  className="rounded-[var(--radius-md)] border border-borde px-4 py-2 text-base font-semibold text-texto-suave hover:bg-superficie"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </div>
+            <FormularioDisposicion
+              modo={modo}
+              motivos={motivos}
+              enviando={enviando}
+              onCancelar={() => {
+                setModo(null);
+                setError(null);
+              }}
+              onConfirmar={(d) =>
+                ejecutar(
+                  modo === "resolver"
+                    ? resolverAlerta({ alertaId: alerta.id, ...d })
+                    : descartarAlerta({ alertaId: alerta.id, ...d }),
+                )
+              }
+            />
           )}
           {error ? <p className="text-sm text-[#b91c1c]">{error}</p> : null}
         </div>
@@ -241,8 +369,10 @@ function Selector<T extends string>({
 
 export default function BandejaAlertas({
   alertas,
+  motivos,
 }: {
   alertas: AlertaDetalle[];
+  motivos: MotivoCatalogo[];
 }) {
   const [estado, setEstado] = useState<EstadoAlerta | "">("");
   const [nivel, setNivel] = useState<NivelEscalado | "">("");
@@ -313,7 +443,7 @@ export default function BandejaAlertas({
       ) : (
         <ul className="flex flex-col gap-3" role="list">
           {visibles.map((a) => (
-            <TarjetaAlerta key={a.id} alerta={a} />
+            <TarjetaAlerta key={a.id} alerta={a} motivos={motivos} />
           ))}
         </ul>
       )}

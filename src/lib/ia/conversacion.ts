@@ -75,6 +75,36 @@ export type ObservacionReciente = {
   fecha: string;
 };
 
+// --- Programa de monitorización (WP-11 v2) ----------------------------------
+
+export type PreguntaExtraCtx = {
+  clave: string;
+  texto: string;
+  dominio?: string;
+};
+
+export type EstiloCheckinCtx = {
+  ritmo: "calmado" | "normal";
+  frases_cortas: boolean;
+  repeticion: boolean;
+};
+
+/**
+ * Recorte del programa activo que dirige la conversación de hoy: subconjunto de
+ * dominios, preguntas extra del guion, estilo y (para oncología) la guía de
+ * vocabulario CTCAE. `null` cuando el paciente no tiene programa (F1 intacto).
+ */
+export type ProgramaContexto = {
+  clave: string;
+  nombre: string;
+  /** Subconjunto de dominios de checklist que el programa activa. */
+  dominios: DominioCheckin[];
+  preguntasExtra: PreguntaExtraCtx[];
+  estilo: EstiloCheckinCtx;
+  /** Guía de códigos de síntomas para el prompt (oncología). */
+  guiaVocabulario?: string;
+};
+
 export type ContextoCheckin = {
   pacienteId: string;
   nombre: string;
@@ -87,6 +117,8 @@ export type ContextoCheckin = {
   resumenUltimoCheckin: string | null;
   observacionesRecientes: ObservacionReciente[];
   dominiosCubiertos: DominioCheckin[];
+  /** Programa activo que dirige el check-in (null/ausente = comportamiento F1). */
+  programa?: ProgramaContexto | null;
 };
 
 /** Extrae los dominios de checklist marcados en `checkins.dominios_cubiertos`. */
@@ -165,6 +197,17 @@ export async function construirContexto(
     .eq("fecha", fechaHoy)
     .maybeSingle();
 
+  // Programa de monitorización activo (WP-11 v2). Carga DIFERIDA del módulo de
+  // servidor para no arrastrar `server-only` a bundles de cliente ni a tests.
+  // Sin programa → `null` → el check-in se comporta como en F1.
+  let programa: ProgramaContexto | null = null;
+  try {
+    const { obtenerContextoPrograma } = await import("@/lib/programas/servidor");
+    programa = await obtenerContextoPrograma(supabase, pacienteId);
+  } catch {
+    programa = null;
+  }
+
   return {
     pacienteId,
     nombre: perfil?.nombre ?? "",
@@ -191,6 +234,7 @@ export async function construirContexto(
     dominiosCubiertos: parsearDominiosCubiertos(
       checkinHoy?.dominios_cubiertos ?? null,
     ),
+    programa,
   };
 }
 
@@ -243,13 +287,22 @@ function lineaObservaciones(observaciones: ObservacionReciente[]): string {
     .join("\n");
 }
 
-function lineaDominios(cubiertos: DominioCheckin[]): {
+function lineaDominios(
+  cubiertos: DominioCheckin[],
+  activos: DominioCheckin[] | null,
+): {
   pendientes: string;
   hechos: string;
 } {
   const setCubiertos = new Set(cubiertos);
-  const pendientes = DOMINIOS_CHECKIN.filter((d) => !setCubiertos.has(d.id));
-  const hechos = DOMINIOS_CHECKIN.filter((d) => setCubiertos.has(d.id));
+  // Si el programa acota los dominios, solo se recorren esos (WP-11 §A.4); si
+  // no hay programa, la checklist completa de F1.
+  const setActivos = activos ? new Set(activos) : null;
+  const base = setActivos
+    ? DOMINIOS_CHECKIN.filter((d) => setActivos.has(d.id))
+    : DOMINIOS_CHECKIN;
+  const pendientes = base.filter((d) => !setCubiertos.has(d.id));
+  const hechos = base.filter((d) => setCubiertos.has(d.id));
   return {
     pendientes:
       pendientes.length > 0
@@ -262,23 +315,68 @@ function lineaDominios(cubiertos: DominioCheckin[]): {
   };
 }
 
+/** Sección `# PROGRAMA` del system prompt (WP-11 v2 §A.4). Vacía si no hay programa. */
+function seccionPrograma(
+  programa: ProgramaContexto | null | undefined,
+): string {
+  if (!programa) return "";
+
+  const partesEstilo: string[] = [];
+  if (programa.estilo.ritmo === "calmado") {
+    partesEstilo.push("ritmo pausado, dando tiempo a responder");
+  }
+  if (programa.estilo.frases_cortas) {
+    partesEstilo.push("frases muy cortas");
+  }
+  if (programa.estilo.repeticion) {
+    partesEstilo.push("puedes repetir o reformular si algo no queda claro");
+  }
+  const estilo =
+    partesEstilo.length > 0
+      ? `- Estilo de conversación: ${partesEstilo.join("; ")}.`
+      : "";
+
+  const preguntas =
+    programa.preguntasExtra.length > 0
+      ? [
+          "- Además de los dominios, cubre con naturalidad estas preguntas del programa (una por turno, sin agobiar):",
+          ...programa.preguntasExtra.map((p) => `    · ${p.texto}`),
+        ].join("\n")
+      : "";
+
+  const vocab = programa.guiaVocabulario ? `\n${programa.guiaVocabulario}` : "";
+
+  return `
+# PROGRAMA de seguimiento: ${programa.nombre}
+Esta persona sigue un programa concreto. Ajusta el check-in a él SIN cambiar las reglas clínicas.
+${estilo}
+${preguntas}${vocab}
+`;
+}
+
 /**
  * System prompt en español que implementa el flujo §2.2 y las reglas clínicas
  * innegociables de CLAUDE.md. Función pura (testeable sin red ni BD).
  */
 export function construirInstrucciones(contexto: ContextoCheckin): string {
-  const { pendientes, hechos } = lineaDominios(contexto.dominiosCubiertos);
+  const dominiosActivos = contexto.programa?.dominios ?? null;
+  const { pendientes, hechos } = lineaDominios(
+    contexto.dominiosCubiertos,
+    dominiosActivos,
+  );
   const edad = contexto.edad != null ? `${contexto.edad} años` : "edad no registrada";
   const condiciones =
     contexto.condiciones.length > 0
       ? contexto.condiciones.join(", ")
       : "sin condiciones registradas";
+  const bloquePrograma = seccionPrograma(contexto.programa);
 
   return `Eres Botsy, un asistente de salud que acompaña a la persona en su check-in DIARIO. Hablas en español de España (es-ES), con tono cálido, cercano y sencillo. La persona puede ser mayor: usa frases CORTAS, vocabulario claro, y haz UNA sola pregunta por turno. Nunca escribas párrafos largos.
 
 # Quién es la persona
 - Nombre: ${contexto.nombre || "(desconocido)"}
 - ${edad}. Vertical clínica: ${contexto.vertical}. Condiciones: ${condiciones}.
+${bloquePrograma}
 
 # Pautas de medicación de hoy (para registrar adherencia)
 ${lineaPautas(contexto.pautasHoy)}

@@ -1,102 +1,194 @@
 "use server";
 
 /**
- * Server Actions de la bandeja de alertas (WP-06).
+ * Server Actions de la bandeja de alertas (WP-06 + WP-11 v2 §B).
  *
- * Marcar vista / resolver (nota opcional) / descartar (motivo OBLIGATORIO). Cada
- * acción: valida con Zod → sesión de profesional/admin → UPDATE con el cliente de
- * SERVIDOR (RLS `alertas_update_profesional` de WP-01 confirma que es de su
- * paciente) → registra en `eventos_auditoria` → revalida. Nunca usa service-role.
+ * REGLA DE ORO 3: `resolver` y `descartar` EXIGEN una disposición estructurada
+ * completa (decisión codificada + motivo del catálogo + días de seguimiento).
+ * Sin ella, la mutación se rechaza — resolver/descartar "a pelo" es imposible
+ * por diseño. Cada acción: valida con Zod estricto → sesión de profesional/admin
+ * → comprueba el motivo contra `catalogo_motivos` → INSERTA la `disposicion` →
+ * actualiza el estado de la alerta → audita. Cliente de SERVIDOR (RLS), nunca
+ * service-role.
+ *
+ * `marcarVista` (sin disposición) sigue permitida: no CIERRA la alerta.
  */
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { obtenerSesionPanel, registrarAuditoria } from "@/lib/panel/sesion-panel";
-import type { EstadoAlerta, Json } from "@/types/db";
+import {
+  validarDisposicion,
+  esquemaRegistrarDesenlace,
+  ETIQUETA_DECISION,
+} from "@/lib/disposiciones/nucleo";
+import type { AmbitoMotivo, EstadoAlerta, Json } from "@/types/db";
 import type { ResultadoAccion } from "@/lib/panel/tipos";
 
 const FALLO_SESION = "No tienes permiso para esta acción.";
 const FALLO_ESCRITURA = "No se pudo actualizar la alerta. Inténtalo de nuevo.";
 
-/**
- * Aplica un cambio de estado a una alerta y lo audita. Comparte la comprobación
- * de sesión y la escritura para las tres acciones.
- */
-async function gestionarAlerta(
-  alertaId: string,
-  nuevoEstado: EstadoAlerta,
-  extra: { motivoDescarte?: string; nota?: string },
-): Promise<ResultadoAccion> {
-  const sesion = await obtenerSesionPanel();
-  if (!sesion) return { ok: false, error: FALLO_SESION };
-
-  const { error } = await sesion.supabase
-    .from("alertas")
-    .update({
-      estado: nuevoEstado,
-      motivo_descarte: extra.motivoDescarte ?? null,
-      gestionada_por: sesion.userId,
-      gestionada_en: new Date().toISOString(),
-    })
-    .eq("id", alertaId);
-
-  if (error) return { ok: false, error: FALLO_ESCRITURA };
-
-  const detalle: Json = {
-    estado: nuevoEstado,
-    ...(extra.nota ? { nota: extra.nota } : {}),
-    ...(extra.motivoDescarte ? { motivo_descarte: extra.motivoDescarte } : {}),
-  };
-  await registrarAuditoria(
-    sesion.supabase,
-    sesion.userId,
-    `alerta_${nuevoEstado}`,
-    "alertas",
-    alertaId,
-    detalle,
-  );
-
-  revalidatePath("/alertas");
-  return { ok: true };
-}
+// --- Marcar vista (no cierra la alerta; sin disposición) ---------------------
 
 const esquemaMarcar = z.object({ alertaId: z.string().uuid() }).strict();
 
 export async function marcarVista(entrada: unknown): Promise<ResultadoAccion> {
   const a = esquemaMarcar.safeParse(entrada);
   if (!a.success) return { ok: false, error: "Datos no válidos." };
-  return gestionarAlerta(a.data.alertaId, "vista", {});
+
+  const sesion = await obtenerSesionPanel();
+  if (!sesion) return { ok: false, error: FALLO_SESION };
+
+  const { error } = await sesion.supabase
+    .from("alertas")
+    .update({
+      estado: "vista",
+      gestionada_por: sesion.userId,
+      gestionada_en: new Date().toISOString(),
+    })
+    .eq("id", a.data.alertaId);
+  if (error) return { ok: false, error: FALLO_ESCRITURA };
+
+  await registrarAuditoria(
+    sesion.supabase,
+    sesion.userId,
+    "alerta_vista",
+    "alertas",
+    a.data.alertaId,
+    { estado: "vista" },
+  );
+  revalidatePath("/alertas");
+  return { ok: true };
 }
 
-const esquemaResolver = z
-  .object({
-    alertaId: z.string().uuid(),
-    nota: z.string().trim().max(500).optional(),
-  })
-  .strict();
+// --- Cierre con disposición estructurada (resolver / descartar) --------------
+
+/**
+ * Cierra una alerta (`resuelta` o `descartada`) creando su `disposicion`. Exige
+ * que la disposición sea COMPLETA y que el motivo pertenezca al ámbito esperado
+ * del catálogo. Idempotencia: `disposiciones.alerta_id` es UNIQUE, así que una
+ * alerta no puede cerrarse dos veces.
+ */
+async function cerrarConDisposicion(
+  entrada: unknown,
+  nuevoEstado: Extract<EstadoAlerta, "resuelta" | "descartada">,
+  ambitoEsperado: AmbitoMotivo,
+): Promise<ResultadoAccion> {
+  const validacion = validarDisposicion(entrada);
+  if (!validacion.ok) return { ok: false, error: validacion.error };
+  const d = validacion.datos;
+
+  const sesion = await obtenerSesionPanel();
+  if (!sesion) return { ok: false, error: FALLO_SESION };
+
+  // El motivo debe existir, estar activo y ser del ámbito correcto.
+  const { data: motivo } = await sesion.supabase
+    .from("catalogo_motivos")
+    .select("id, etiqueta, ambito, activo")
+    .eq("id", d.motivoCodigo)
+    .maybeSingle();
+  if (!motivo || motivo.activo === false || motivo.ambito !== ambitoEsperado) {
+    return { ok: false, error: "El motivo seleccionado no es válido." };
+  }
+
+  // Inserta la disposición (fuente de verdad del cierre). alerta_id UNIQUE ⇒ si
+  // ya estaba cerrada, la inserción falla y no se duplica.
+  const { data: dispuesta, error: errDisp } = await sesion.supabase
+    .from("disposiciones")
+    .insert({
+      alerta_id: d.alertaId,
+      decision: d.decision,
+      motivo_codigo: d.motivoCodigo,
+      motivo_texto: d.motivoTexto ?? null,
+      dias_seguimiento: d.diasSeguimiento,
+      creada_por: sesion.userId,
+    })
+    .select("id")
+    .maybeSingle();
+  if (errDisp || !dispuesta) {
+    return {
+      ok: false,
+      error:
+        "Esta alerta ya tiene una disposición registrada o no se pudo guardar.",
+    };
+  }
+
+  // Actualiza el estado de la alerta. `motivo_descarte` conserva el texto legible
+  // para la vista (compatibilidad con WP-06).
+  const motivoLegible = d.motivoTexto ?? motivo.etiqueta;
+  const { error: errAlerta } = await sesion.supabase
+    .from("alertas")
+    .update({
+      estado: nuevoEstado,
+      motivo_descarte: nuevoEstado === "descartada" ? motivoLegible : null,
+      gestionada_por: sesion.userId,
+      gestionada_en: new Date().toISOString(),
+    })
+    .eq("id", d.alertaId);
+  if (errAlerta) return { ok: false, error: FALLO_ESCRITURA };
+
+  const detalle: Json = {
+    estado: nuevoEstado,
+    disposicion_id: dispuesta.id,
+    decision: d.decision,
+    decision_etiqueta: ETIQUETA_DECISION[d.decision],
+    motivo_codigo: d.motivoCodigo,
+    dias_seguimiento: d.diasSeguimiento,
+    ...(d.motivoTexto ? { motivo_texto: d.motivoTexto } : {}),
+  };
+  await registrarAuditoria(
+    sesion.supabase,
+    sesion.userId,
+    `alerta_${nuevoEstado}`,
+    "alertas",
+    d.alertaId,
+    detalle,
+  );
+
+  revalidatePath("/alertas");
+  revalidatePath("/desenlaces");
+  return { ok: true };
+}
 
 export async function resolverAlerta(entrada: unknown): Promise<ResultadoAccion> {
-  const a = esquemaResolver.safeParse(entrada);
-  if (!a.success) return { ok: false, error: "Datos no válidos." };
-  return gestionarAlerta(a.data.alertaId, "resuelta", {
-    nota: a.data.nota && a.data.nota.length > 0 ? a.data.nota : undefined,
-  });
+  return cerrarConDisposicion(entrada, "resuelta", "disposicion");
 }
 
-const esquemaDescartar = z
-  .object({
-    alertaId: z.string().uuid(),
-    // El motivo es OBLIGATORIO (WP-06): alimenta el ciclo de mejora futuro.
-    motivo: z.string().trim().min(3).max(500),
-  })
-  .strict();
-
 export async function descartarAlerta(entrada: unknown): Promise<ResultadoAccion> {
-  const a = esquemaDescartar.safeParse(entrada);
-  if (!a.success) {
-    return { ok: false, error: "El motivo del descarte es obligatorio (mín. 3 caracteres)." };
-  }
-  return gestionarAlerta(a.data.alertaId, "descartada", {
-    motivoDescarte: a.data.motivo,
-  });
+  return cerrarConDisposicion(entrada, "descartada", "descarte");
+}
+
+// --- Registro del desenlace de una disposición (WP-11 v2 §B.3) ---------------
+
+export async function registrarDesenlace(
+  entrada: unknown,
+): Promise<ResultadoAccion> {
+  const a = esquemaRegistrarDesenlace.safeParse(entrada);
+  if (!a.success) return { ok: false, error: "Datos del desenlace no válidos." };
+
+  const sesion = await obtenerSesionPanel();
+  if (!sesion) return { ok: false, error: FALLO_SESION };
+
+  const { error } = await sesion.supabase
+    .from("disposiciones")
+    .update({
+      desenlace: a.data.desenlace,
+      desenlace_nota: a.data.nota ?? null,
+      desenlace_registrado_en: new Date().toISOString(),
+    })
+    .eq("id", a.data.disposicionId);
+  if (error) return { ok: false, error: FALLO_ESCRITURA };
+
+  await registrarAuditoria(
+    sesion.supabase,
+    sesion.userId,
+    "desenlace_registrado",
+    "disposiciones",
+    a.data.disposicionId,
+    { desenlace: a.data.desenlace, ...(a.data.nota ? { nota: a.data.nota } : {}) },
+  );
+
+  revalidatePath("/desenlaces");
+  revalidatePath("/alertas");
+  return { ok: true };
 }

@@ -47,7 +47,29 @@ export type EstadoAlerta = "nueva" | "vista" | "resuelta" | "descartada";
 export type TipoConsentimiento =
   | "conversacion"
   | "voz_grabacion"
-  | "voz_biomarcadores";
+  | "voz_biomarcadores"
+  | "uso_secundario";
+
+// --- Programas de monitorización (WP-11 v2) ---------------------------------
+export type EstadoProgramaPaciente = "activo" | "completado" | "suspendido";
+
+// --- Disposición estructurada (WP-11 v2, regla de oro 3) --------------------
+export type AmbitoMotivo = "disposicion" | "descarte" | "discontinuacion";
+export type DecisionDisposicion =
+  | "contactado_paciente"
+  | "ajuste_pauta"
+  | "derivado_consulta"
+  | "derivado_urgencias"
+  | "observacion"
+  | "sin_accion_justificada";
+export type DesenlaceDisposicion =
+  | "pendiente"
+  | "resuelto_sin_evento"
+  | "visita_no_programada"
+  | "urgencias"
+  | "hospitalizacion"
+  | "discontinuacion"
+  | "otro";
 
 // --- Filas (Row) ------------------------------------------------------------
 export type Perfil = {
@@ -87,6 +109,8 @@ export type PautaMedicacion = {
   creada_por: string | null;
   creado_en: string;
   desactivada_en: string | null;
+  /** Motivo codificado de discontinuación (WP-11 v2 §C.4). NULL si fue baja por error. */
+  motivo_discontinuacion: string | null;
 }
 
 export type Checkin = {
@@ -147,6 +171,13 @@ export type ReglaEscalado = {
   nivel: NivelEscalado;
   activa: boolean;
   creado_en: string;
+  /**
+   * Asignación de programa que MATERIALIZÓ esta regla (WP-11 v2 §A.5). NULL para
+   * reglas globales, de vertical o creadas a mano por el profesional. Sirve de
+   * clave de activación idempotente y de limpieza en cascada al eliminar la
+   * asignación.
+   */
+  programa_paciente_id: string | null;
 }
 
 export type Alerta = {
@@ -195,6 +226,53 @@ export type Informe = {
   generado_en: string;
 }
 
+export type Programa = {
+  id: string;
+  clave: string;
+  nombre: string;
+  descripcion: string | null;
+  version: number;
+  config: Json;
+  activo: boolean;
+  creado_en: string;
+}
+
+export type ProgramaPaciente = {
+  id: string;
+  paciente_id: string;
+  programa_id: string;
+  config_override: Json;
+  fase_actual: number;
+  fecha_inicio: string | null;
+  fecha_evento: string | null;
+  estado: EstadoProgramaPaciente;
+  asignado_por: string | null;
+  creado_en: string;
+}
+
+export type CatalogoMotivo = {
+  id: string;
+  ambito: AmbitoMotivo;
+  codigo: string;
+  etiqueta: string;
+  activo: boolean;
+  creado_en: string;
+}
+
+export type Disposicion = {
+  id: string;
+  alerta_id: string;
+  decision: DecisionDisposicion;
+  motivo_codigo: string | null;
+  motivo_texto: string | null;
+  dias_seguimiento: number;
+  desenlace: DesenlaceDisposicion;
+  desenlace_nota: string | null;
+  desenlace_registrado_en: string | null;
+  creada_por: string | null;
+  creado_en: string;
+}
+
 // --- Inserts (columnas con default/nulables son opcionales) -----------------
 export type PerfilInsert = {
   id: string;
@@ -233,6 +311,7 @@ export type PautaMedicacionInsert = {
   creada_por?: string | null;
   creado_en?: string;
   desactivada_en?: string | null;
+  motivo_discontinuacion?: string | null;
 }
 
 export type CheckinInsert = {
@@ -293,6 +372,7 @@ export type ReglaEscaladoInsert = {
   nivel: NivelEscalado;
   activa?: boolean;
   creado_en?: string;
+  programa_paciente_id?: string | null;
 }
 
 export type AlertaInsert = {
@@ -339,6 +419,53 @@ export type InformeInsert = {
   resumen?: string | null;
   modelo?: string | null;
   generado_en?: string;
+}
+
+export type ProgramaInsert = {
+  id?: string;
+  clave: string;
+  nombre: string;
+  descripcion?: string | null;
+  version?: number;
+  config: Json;
+  activo?: boolean;
+  creado_en?: string;
+}
+
+export type ProgramaPacienteInsert = {
+  id?: string;
+  paciente_id: string;
+  programa_id: string;
+  config_override?: Json;
+  fase_actual?: number;
+  fecha_inicio?: string | null;
+  fecha_evento?: string | null;
+  estado?: EstadoProgramaPaciente;
+  asignado_por?: string | null;
+  creado_en?: string;
+}
+
+export type CatalogoMotivoInsert = {
+  id?: string;
+  ambito: AmbitoMotivo;
+  codigo: string;
+  etiqueta: string;
+  activo?: boolean;
+  creado_en?: string;
+}
+
+export type DisposicionInsert = {
+  id?: string;
+  alerta_id: string;
+  decision: DecisionDisposicion;
+  motivo_codigo?: string | null;
+  motivo_texto?: string | null;
+  dias_seguimiento?: number;
+  desenlace?: DesenlaceDisposicion;
+  desenlace_nota?: string | null;
+  desenlace_registrado_en?: string | null;
+  creada_por?: string | null;
+  creado_en?: string;
 }
 
 // --- Esquema para los genéricos de supabase-js ------------------------------
@@ -415,6 +542,30 @@ export type BaseDatos = {
         Row: Informe;
         Insert: InformeInsert;
         Update: Partial<InformeInsert>;
+        Relationships: [];
+      };
+      programas: {
+        Row: Programa;
+        Insert: ProgramaInsert;
+        Update: Partial<ProgramaInsert>;
+        Relationships: [];
+      };
+      programas_paciente: {
+        Row: ProgramaPaciente;
+        Insert: ProgramaPacienteInsert;
+        Update: Partial<ProgramaPacienteInsert>;
+        Relationships: [];
+      };
+      catalogo_motivos: {
+        Row: CatalogoMotivo;
+        Insert: CatalogoMotivoInsert;
+        Update: Partial<CatalogoMotivoInsert>;
+        Relationships: [];
+      };
+      disposiciones: {
+        Row: Disposicion;
+        Insert: DisposicionInsert;
+        Update: Partial<DisposicionInsert>;
         Relationships: [];
       };
     };

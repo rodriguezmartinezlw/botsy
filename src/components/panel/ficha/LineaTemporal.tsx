@@ -18,6 +18,7 @@ import type {
   ItemMedicacion,
   ItemTimeline,
 } from "@/lib/panel/tipos";
+import type { TipoConsentimiento } from "@/types/db";
 import BadgeNivel from "../BadgeNivel";
 import EvidenciaAlerta from "../EvidenciaAlerta";
 
@@ -121,11 +122,12 @@ function DetalleCheckin({ item }: { item: ItemCheckin }) {
 
 const CANAL_ETIQUETA = { texto: "Check-in por texto", voz: "Check-in por voz" } as const;
 
-const TIPO_CONSENTIMIENTO = {
+const TIPO_CONSENTIMIENTO: Record<TipoConsentimiento, string> = {
   conversacion: "conversación",
   voz_grabacion: "grabación de voz",
   voz_biomarcadores: "biomarcadores de voz",
-} as const;
+  uso_secundario: "uso secundario (investigación)",
+};
 
 function FilaItem({ item }: { item: ItemTimeline }) {
   switch (item.tipo) {
