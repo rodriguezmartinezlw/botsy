@@ -476,3 +476,24 @@ values
   -- Beatriz prueba uso secundario y lo revoca (historial demostrable).
   ('00000000-0000-4000-8000-000000000018', 'uso_secundario', true,  'v0-borrador', now() - interval '20 days'),
   ('00000000-0000-4000-8000-000000000018', 'uso_secundario', false, 'v0-borrador', now() - interval '8 days');
+
+-- =====================================================================
+-- Materialización de las reglas de escalado del programa asignado
+-- (WP-09 — corrección del director). El panel materializa las reglas al
+-- ASIGNAR el programa (sincronizarReglasPrograma); como el seed inserta las
+-- asignaciones directamente, replicamos aquí esa lógica para que las reglas
+-- oncológicas (fiebre, distrés, etc.) existan por paciente y el escalado
+-- funcione en un check-in real. Idempotente: no duplica por nombre+asignación.
+-- =====================================================================
+insert into public.reglas_escalado
+  (paciente_id, vertical, nombre, descripcion, condicion, nivel, activa, programa_paciente_id)
+select pp.paciente_id, null, r->>'nombre', r->>'descripcion', r->'condicion',
+       (r->>'nivel')::text, true, pp.id
+from public.programas_paciente pp
+join public.programas p on p.id = pp.programa_id
+cross join lateral jsonb_array_elements(p.config->'escalado'->'reglas_clave') as r
+where pp.estado = 'activo'
+  and not exists (
+    select 1 from public.reglas_escalado re
+    where re.programa_paciente_id = pp.id and re.nombre = r->>'nombre'
+  );

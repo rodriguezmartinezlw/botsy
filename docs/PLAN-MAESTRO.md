@@ -114,7 +114,9 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-11 v2 (programas oncología + disposición estructurada) | ✅ aprobado (commit) — ver `docs/revisiones/WP-11-revision.md` |
 | WP-17 + WP-15 (dashboard patrocinador + demo + ROI) | ✅ aprobado (commit) — ver `docs/revisiones/WP-17-revision.md`. **Demo vendible lista** (`docs/DEMO-GUION.md`) |
 | WP-16 (termómetro NCCN) | ✅ aprobado (commit) — ver `docs/revisiones/WP-16-revision.md` |
-| WP-09 (aplicar migraciones al Supabase en vivo + E2E) | ▶️ EN CURSO (claves en .env.local; BD vacía) |
+| WP-09 (Supabase en vivo + E2E) | ✅ completado (commit) — ver `docs/revisiones/WP-09-revision.md`. BD viva; 2 bugs reales corregidos (0012, 0013); IA probada con clave real |
+
+**PILOTO F-piloto COMPLETO EN CÓDIGO (2026-07-17):** WP-10, 11v2, 17+15, 16, 09 construidos, revisados y en `github.com/rodriguezmartinezlw/botsy`. BD en vivo poblada. Pendiente: las 3 llamadas del fundador (umbrales `[PENDIENTE CLÍNICO]`), Resend, textos legales.
 | WP-16 (termómetro NCCN) · WP-17 (dashboard patrocinador + demo) · WP-15 (ROI) | ⏳ specs en PLAN-TECNICO §5; fin sprint 2 = demo vendible |
 | WP-18 (farmacovigilancia) | ⏳ puerta: primera LOI farma |
 | WP-19 (cuidador-proxy pediátrico) | ⏳ puerta: asociación/fundación |

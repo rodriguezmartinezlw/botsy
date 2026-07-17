@@ -91,6 +91,18 @@ describe("RLS — invariantes de la matriz de acceso (WP-01)", () => {
     expect(RLS).not.toMatch(/reglas_\w*_propio/);
   });
 
+  it("reglas_escalado: el SELECT queda gateado a profesional/admin (WP-09 fix 0012)", () => {
+    // 0002 dejaba ver las reglas GLOBALES a cualquier autenticado (paciente
+    // incluido) por la rama `paciente_id is null`. 0012 lo endurece: el paciente
+    // no lee ninguna fila de reglas_escalado. Detectado por acceso_cruzado.sql en vivo.
+    const RLS12 = readFileSync(
+      join(RAIZ, "supabase", "migrations", "0012_fix_rls_reglas_escalado.sql"),
+      "utf8",
+    );
+    expect(RLS12).toMatch(/reglas_select_profesional/);
+    expect(RLS12).toMatch(/es_profesional_o_admin\(\)/);
+  });
+
   it("consentimientos y eventos_auditoria son append-only (sin UPDATE/DELETE)", () => {
     // No debe haber políticas 'for update'/'for delete' sobre estas tablas.
     expect(RLS).not.toMatch(/on public\.consentimientos\s+for (update|delete)/);
