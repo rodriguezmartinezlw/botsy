@@ -33,6 +33,10 @@
 | 3 | [WP-19](wp/WP-19-cuidador-proxy.md) | Cuidador-proxy pediátrico (titular = adulto; la IA jamás conversa con el menor) | ⛔ Asociación/fundación |
 | ∥ | Deploy a Vercel | `docs/DESPLIEGUE.md` está listo; falta decidir cuenta Vercel y ejecutarlo (cron horario requiere plan Pro). La demo NO lo necesita (corre en local) | Decisión del fundador |
 
+| 4 | [WP-21](wp/WP-21-rendimiento-rls.md) | Rendimiento de RLS a escala (`auth_rls_initplan`, `multiple_permissive_policies` — del linter de Supabase) | Sin puerta, **NO urgente** (negligible con decenas de pacientes; hacer al crecer) |
+
+**Auditoría de verificación 2026-07-17** (`docs/revisiones/REVISION-2026-07-17-auditoria.md`): sin fugas de datos ni bugs de corrección nuevos. Corregido un cierre de seguridad latente (RPC del patrocinador ejecutables por anon por un `revoke` inefectivo de 0010 → migración **0014**) y añadidos 20 índices de FK (**0015**). Config pendiente: protección de contraseñas filtradas (HIBP) requiere plan Pro de Supabase.
+
 **Deuda menor anotada** (no bloquea; ver revisiones): redundancia `desactivada_en`/`discontinuada_en` (limpieza opcional), mover la materialización de reglas del seed a función invocable, RPC transaccional del cierre, SSE del último turno.
 
 ## Insumos que solo puede aportar el fundador
