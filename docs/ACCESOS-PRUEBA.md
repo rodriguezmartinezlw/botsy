@@ -10,6 +10,8 @@ npm run dev
 ```
 → abre **http://localhost:3000** (el `.env.local` ya apunta a la BD real y a OpenAI).
 
+**EN PRODUCCIÓN (Vercel, 2026-07-17):** la app está desplegada en **https://botsy-bice.vercel.app** — mismas credenciales, misma BD. Puedes probar directamente desde el móvil (ideal para la voz y el QA visual).
+
 - **Modo demo del patrocinador sin login** (para ensayar la venta): `DEMO_MODE=true npm run dev` → http://localhost:3000/patrocinador (marca de agua "DEMO"). Guion de 10 min: `docs/DEMO-GUION.md`.
 
 ## Credenciales (contraseña común: `Botsy1234!`)
@@ -54,7 +56,7 @@ npm run dev
 - **Emails de recordatorio diario y aviso de urgencia al profesional**: falta `RESEND_API_KEY`. (Invitación y recuperación SÍ funcionan, van por Supabase.)
 - Los emails `@botsy.local` no reciben correo (usa tu email real para probar invitación/recuperación).
 - Los umbrales clínicos usan los valores ESTÁNDAR de guías (NCCN/IDSA/CTCAE) y los textos legales la versión genérica v1 — ambos configurables; revisión experta recomendable antes de pacientes reales.
-- La app corre solo en local (sin deploy a Vercel todavía).
+- El cron de recordatorios corre 1 vez/día (20:00 UTC) — el horario requiere plan Pro de Vercel.
 
 ## Si algo falla
 
