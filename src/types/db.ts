@@ -17,7 +17,7 @@ export type Json =
   | Json[];
 
 // --- Enumeraciones (checks del SQL) -----------------------------------------
-export type RolPerfil = "paciente" | "profesional" | "admin";
+export type RolPerfil = "paciente" | "profesional" | "admin" | "patrocinador";
 export type VerticalPaciente =
   | "cardiovascular"
   | "cronica"
@@ -72,6 +72,9 @@ export type DesenlaceDisposicion =
   | "otro";
 
 // --- Filas (Row) ------------------------------------------------------------
+// --- Patrocinadores (WP-17) -------------------------------------------------
+export type TipoPatrocinador = "laboratorio" | "pagador" | "fundacion" | "otro";
+
 export type Perfil = {
   id: string;
   rol: RolPerfil;
@@ -80,6 +83,8 @@ export type Perfil = {
   avatar_url: string | null;
   idioma: string;
   zona_horaria: string;
+  /** Patrocinador (organización) al que pertenece un usuario patrocinador; NULL en el resto (WP-17). */
+  patrocinador_id: string | null;
   creado_en: string;
 }
 
@@ -109,6 +114,8 @@ export type PautaMedicacion = {
   creada_por: string | null;
   creado_en: string;
   desactivada_en: string | null;
+  /** Fecha de discontinuación clínica (PLAN §4.3, WP-17). Alimenta persistencia. */
+  discontinuada_en: string | null;
   /** Motivo codificado de discontinuación (WP-11 v2 §C.4). NULL si fue baja por error. */
   motivo_discontinuacion: string | null;
 }
@@ -273,6 +280,23 @@ export type Disposicion = {
   creado_en: string;
 }
 
+export type Patrocinador = {
+  id: string;
+  nombre: string;
+  tipo: TipoPatrocinador;
+  activo: boolean;
+  creado_en: string;
+}
+
+export type ProgramaPatrocinado = {
+  id: string;
+  patrocinador_id: string;
+  programa_id: string;
+  etiqueta_cohorte: string | null;
+  activo: boolean;
+  creado_en: string;
+}
+
 // --- Inserts (columnas con default/nulables son opcionales) -----------------
 export type PerfilInsert = {
   id: string;
@@ -282,6 +306,24 @@ export type PerfilInsert = {
   avatar_url?: string | null;
   idioma?: string;
   zona_horaria?: string;
+  patrocinador_id?: string | null;
+  creado_en?: string;
+}
+
+export type PatrocinadorInsert = {
+  id?: string;
+  nombre: string;
+  tipo?: TipoPatrocinador;
+  activo?: boolean;
+  creado_en?: string;
+}
+
+export type ProgramaPatrocinadoInsert = {
+  id?: string;
+  patrocinador_id: string;
+  programa_id: string;
+  etiqueta_cohorte?: string | null;
+  activo?: boolean;
   creado_en?: string;
 }
 
@@ -311,6 +353,7 @@ export type PautaMedicacionInsert = {
   creada_por?: string | null;
   creado_en?: string;
   desactivada_en?: string | null;
+  discontinuada_en?: string | null;
   motivo_discontinuacion?: string | null;
 }
 
@@ -566,6 +609,18 @@ export type BaseDatos = {
         Row: Disposicion;
         Insert: DisposicionInsert;
         Update: Partial<DisposicionInsert>;
+        Relationships: [];
+      };
+      patrocinadores: {
+        Row: Patrocinador;
+        Insert: PatrocinadorInsert;
+        Update: Partial<PatrocinadorInsert>;
+        Relationships: [];
+      };
+      programas_patrocinados: {
+        Row: ProgramaPatrocinado;
+        Insert: ProgramaPatrocinadoInsert;
+        Update: Partial<ProgramaPatrocinadoInsert>;
         Relationships: [];
       };
     };

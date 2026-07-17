@@ -196,11 +196,17 @@ export async function discontinuarPauta(
     return { ok: false, error: "El motivo de discontinuación no es válido." };
   }
 
+  // `desactivada_en` = cualquier baja; `discontinuada_en` = baja clínica REAL
+  // (con motivo codificado) — la que alimenta las curvas de persistencia/ROI del
+  // patrocinador (WP-17). Se rellena aquí para que esas curvas reflejen datos
+  // reales, no solo el seed. Ambas comparten el mismo instante.
+  const ahora = new Date().toISOString();
   const { error } = await sesion.supabase
     .from("pautas_medicacion")
     .update({
       activa: false,
-      desactivada_en: new Date().toISOString(),
+      desactivada_en: ahora,
+      discontinuada_en: ahora,
       motivo_discontinuacion: p.motivoId,
     })
     .eq("id", p.pautaId)

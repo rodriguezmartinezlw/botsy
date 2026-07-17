@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { destinoSeguro, rutaPorRol } from "./roles";
 
 describe("rutaPorRol", () => {
-  it("profesional/admin → /pacientes, resto → /inicio", () => {
+  it("profesional/admin → /pacientes, patrocinador → /patrocinador, resto → /inicio", () => {
     expect(rutaPorRol("profesional")).toBe("/pacientes");
     expect(rutaPorRol("admin")).toBe("/pacientes");
+    expect(rutaPorRol("patrocinador")).toBe("/patrocinador");
     expect(rutaPorRol("paciente")).toBe("/inicio");
     expect(rutaPorRol(null)).toBe("/inicio");
   });

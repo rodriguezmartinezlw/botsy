@@ -9,8 +9,12 @@
 --   4. Un profesional solo ve a SUS pacientes asignados (no los de otro).
 --   5. El anónimo (anon, sin sesión) NO lee nada.
 --
+-- Nota: tras el seed oncológico de WP-17, …0003 = María y …0004 = Carmen (ambas
+-- pacientes de la Dra. García, cáncer de mama). Los escenarios 1-6 siguen siendo
+-- válidos (son por ID). Se añaden los escenarios 7-8 (patrocinador, WP-17).
+--
 -- CÓMO EJECUTAR (requiere un entorno Supabase con las migraciones + ambos seeds):
---   supabase db reset                       # aplica 0001..0004 + supabase/seed.sql
+--   supabase db reset                       # aplica 0001..0010 + supabase/seed.sql
 --   psql "$DATABASE_URL" -f supabase/seed_wp06_segundo_profesional.sql
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/acceso_cruzado.sql
 --
@@ -161,6 +165,83 @@ begin
 
   reset role;
   raise notice 'OK: el anónimo NO lee ningún dato';
+end $$;
+
+-- --- Escenario 7: el PATROCINADOR no lee NINGUNA tabla de pacientes (WP-17) ---
+-- El usuario patrocinador del seed (…0009) no tiene ninguna política de lectura
+-- sobre las tablas clínicas: debe ver 0 filas en todas. Su único acceso son las
+-- RPC de agregados (escenario 8).
+do $$
+declare
+  v_patro uuid := '00000000-0000-4000-8000-000000000009';
+  n int;
+begin
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_patro), true);
+  set local role authenticated;
+
+  select count(*) into n from public.pacientes;
+  assert n = 0, 'FALLO: el patrocinador lee pacientes';
+  select count(*) into n from public.observaciones;
+  assert n = 0, 'FALLO: el patrocinador lee observaciones';
+  select count(*) into n from public.checkins;
+  assert n = 0, 'FALLO: el patrocinador lee check-ins';
+  select count(*) into n from public.alertas;
+  assert n = 0, 'FALLO: el patrocinador lee alertas';
+  select count(*) into n from public.disposiciones;
+  assert n = 0, 'FALLO: el patrocinador lee disposiciones';
+  select count(*) into n from public.tomas_medicacion;
+  assert n = 0, 'FALLO: el patrocinador lee tomas de medicación';
+  select count(*) into n from public.pautas_medicacion;
+  assert n = 0, 'FALLO: el patrocinador lee pautas de medicación';
+  select count(*) into n from public.mensajes;
+  assert n = 0, 'FALLO: el patrocinador lee mensajes';
+
+  reset role;
+  raise notice 'OK: el patrocinador NO lee ninguna tabla de pacientes';
+end $$;
+
+-- --- Escenario 8: las RPC de agregados aplican k-anonimato (>= 5) -------------
+-- La cohorte combinada (10) devuelve agregados; el corte «Tratamiento activo»
+-- (4 pacientes < 5) se OMITE / marca datos_insuficientes. El patrocinador nunca
+-- obtiene un corte < 5.
+do $$
+declare
+  v_patro   uuid := '00000000-0000-4000-8000-000000000009';
+  v_oral    uuid;
+  v_activo  uuid;
+  v_n       int;
+  v_insuf   boolean;
+  v_filas   int;
+begin
+  select id into v_oral   from public.programas where clave = 'mama_terapia_oral' limit 1;
+  select id into v_activo from public.programas where clave = 'mama_tratamiento_activo' limit 1;
+
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_patro), true);
+  set local role authenticated;
+
+  -- Cohorte combinada: >= 5 => hay agregados (persistencia devuelve filas).
+  select count(*) into v_filas from public.patro_persistencia(null);
+  assert v_filas > 0, 'FALLO: la cohorte combinada (>=5) no devuelve persistencia';
+
+  -- «Terapia oral» (6 >= 5) => resumen suficiente.
+  select n_pacientes, datos_insuficientes into v_n, v_insuf
+    from public.patro_resumen_cohorte(v_oral);
+  assert v_insuf = false, 'FALLO: «Terapia oral» (6) marcada como insuficiente';
+  assert v_n >= 5, 'FALLO: «Terapia oral» no revela n >= 5';
+
+  -- «Tratamiento activo» (4 < 5) => datos_insuficientes, n oculto (NULL), y la
+  -- persistencia de ese corte se OMITE (0 filas).
+  select n_pacientes, datos_insuficientes into v_n, v_insuf
+    from public.patro_resumen_cohorte(v_activo);
+  assert v_insuf = true, 'FALLO: «Tratamiento activo» (4) NO marcada insuficiente';
+  assert v_n is null, 'FALLO: «Tratamiento activo» (4) revela el conteo exacto';
+  select count(*) into v_filas from public.patro_persistencia(v_activo);
+  assert v_filas = 0, 'FALLO: se devuelve persistencia de un corte < 5';
+
+  reset role;
+  raise notice 'OK: las RPC de agregados omiten cortes < 5 (k-anonimato)';
 end $$;
 
 do $$

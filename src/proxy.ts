@@ -17,6 +17,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { modoDemo } from "@/lib/demo";
 
 /** Prefijos de página que exigen sesión. */
 const PROTEGIDAS = [
@@ -27,6 +28,7 @@ const PROTEGIDAS = [
   "/pacientes",
   "/alertas",
   "/configuracion",
+  "/patrocinador",
 ];
 
 function esProtegida(pathname: string): boolean {
@@ -38,6 +40,17 @@ function esProtegida(pathname: string): boolean {
 export async function proxy(request: NextRequest): Promise<NextResponse> {
   const { pathname, search } = request.nextUrl;
   if (!esProtegida(pathname)) return NextResponse.next();
+
+  // MODO DEMO (WP-17): el área del patrocinador es pública sobre el seed
+  // sintético, para poder demostrarla en LOCAL aunque haya claves en .env.local.
+  // El guard del layout también se salta en demo; la garantía de privacidad NO
+  // depende de esto (solo agregados k>=5, RLS 0009 + RPC 0010).
+  if (
+    modoDemo() &&
+    (pathname === "/patrocinador" || pathname.startsWith("/patrocinador/"))
+  ) {
+    return NextResponse.next();
+  }
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
