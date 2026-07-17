@@ -25,6 +25,7 @@ const PROTEGIDAS = [
   "/checkin",
   "/perfil",
   "/consentimientos",
+  "/historial",
   "/pacientes",
   "/alertas",
   "/configuracion",
