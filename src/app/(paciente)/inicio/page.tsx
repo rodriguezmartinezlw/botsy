@@ -47,7 +47,7 @@ async function cargarEstado(): Promise<EstadoInicio> {
 
     const { data: paciente } = await supabase
       .from("pacientes")
-      .select("racha_actual, profesional_id")
+      .select("racha_actual, profesional_id, institucion_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -73,9 +73,13 @@ async function cargarEstado(): Promise<EstadoInicio> {
       estadoCheckinHoy: checkin?.estado ?? null,
       puedeConversar: puedeConversar(consent),
       // Si no hay fila de paciente todavía, no mostramos el aviso (evita falsos
-      // positivos ante un backend a medio configurar); solo cuando existe y su
-      // profesional_id es null es realmente un "huérfano".
-      vinculado: paciente ? paciente.profesional_id !== null : true,
+      // positivos ante un backend a medio configurar). Con el modelo por
+      // institución (WP-22), la INVISIBILIDAD real la causa institucion_id NULL
+      // (ningún profesional lo ve), así que el aviso cubre ambos huecos:
+      // sin médico responsable O sin institución.
+      vinculado: paciente
+        ? paciente.profesional_id !== null && paciente.institucion_id !== null
+        : true,
       email: user.email ?? "",
     };
   } catch {
