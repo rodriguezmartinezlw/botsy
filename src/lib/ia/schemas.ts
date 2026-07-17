@@ -14,6 +14,12 @@
 
 import { z } from "zod";
 import { rangoValorNum, esCodigoCelsius } from "./vocabulario-onco";
+import {
+  CODIGOS_PROBLEMAS_NCCN,
+  DISTRES_MAX,
+  DISTRES_MIN,
+  INSTRUMENTOS,
+} from "@/lib/instrumentos/termometro";
 
 // --- Vocabularios (espejo de los checks del SQL / dominios de checklist) -----
 
@@ -116,11 +122,27 @@ export const esquemaFinalizarCheckin = z
   })
   .strict();
 
+/**
+ * Argumentos de `registrar_instrumento` (WP-16): administración conversacional
+ * del Termómetro de Distrés NCCN. El modelo aporta la PUNTUACIÓN (0–10) y, solo
+ * si es alta, la lista de PROBLEMAS marcados (códigos del catálogo NCCN). La
+ * `version` NO la aporta el modelo: la estampa el servidor (integridad del dato).
+ * Se rechaza cualquier problema que no esté en el catálogo (traza fiable).
+ */
+export const esquemaRegistrarInstrumento = z
+  .object({
+    instrumento: z.enum(INSTRUMENTOS),
+    puntuacion: z.number().min(DISTRES_MIN).max(DISTRES_MAX),
+    problemas: z.array(z.enum(CODIGOS_PROBLEMAS_NCCN)).max(40).optional(),
+  })
+  .strict();
+
 export type ArgsRegistrarObservacion = z.infer<typeof esquemaRegistrarObservacion>;
 export type ArgsRegistrarToma = z.infer<typeof esquemaRegistrarToma>;
 export type ArgsMarcarDominioCubierto = z.infer<typeof esquemaMarcarDominioCubierto>;
 export type ArgsSenalAlarma = z.infer<typeof esquemaSenalAlarma>;
 export type ArgsFinalizarCheckin = z.infer<typeof esquemaFinalizarCheckin>;
+export type ArgsRegistrarInstrumento = z.infer<typeof esquemaRegistrarInstrumento>;
 
 // --- Reconciliación (segunda pasada estructurada sobre el transcript) --------
 

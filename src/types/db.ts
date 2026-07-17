@@ -71,6 +71,10 @@ export type DesenlaceDisposicion =
   | "discontinuacion"
   | "otro";
 
+// --- Instrumentos (WP-16, Termómetro de Distrés NCCN) -----------------------
+export type ClaveInstrumento = "termometro_distres_nccn";
+export type OrigenInstrumento = "conversacional" | "formulario";
+
 // --- Filas (Row) ------------------------------------------------------------
 // --- Patrocinadores (WP-17) -------------------------------------------------
 export type TipoPatrocinador = "laboratorio" | "pagador" | "fundacion" | "otro";
@@ -280,6 +284,19 @@ export type Disposicion = {
   creado_en: string;
 }
 
+export type InstrumentoRespuesta = {
+  id: string;
+  paciente_id: string;
+  checkin_id: string | null;
+  instrumento: ClaveInstrumento;
+  version_instrumento: string;
+  puntuacion: number;
+  /** Lista de códigos de problemas marcados (catálogo NCCN). */
+  items: Json;
+  origen: OrigenInstrumento;
+  creado_en: string;
+}
+
 export type Patrocinador = {
   id: string;
   nombre: string;
@@ -307,6 +324,18 @@ export type PerfilInsert = {
   idioma?: string;
   zona_horaria?: string;
   patrocinador_id?: string | null;
+  creado_en?: string;
+}
+
+export type InstrumentoRespuestaInsert = {
+  id?: string;
+  paciente_id: string;
+  checkin_id?: string | null;
+  instrumento?: ClaveInstrumento;
+  version_instrumento: string;
+  puntuacion: number;
+  items?: Json;
+  origen?: OrigenInstrumento;
   creado_en?: string;
 }
 
@@ -609,6 +638,12 @@ export type BaseDatos = {
         Row: Disposicion;
         Insert: DisposicionInsert;
         Update: Partial<DisposicionInsert>;
+        Relationships: [];
+      };
+      instrumentos_respuestas: {
+        Row: InstrumentoRespuesta;
+        Insert: InstrumentoRespuestaInsert;
+        Update: Partial<InstrumentoRespuestaInsert>;
         Relationships: [];
       };
       patrocinadores: {

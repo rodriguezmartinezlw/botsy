@@ -113,8 +113,8 @@ Orden de ejecución: 00 → 01 → 02 → (03 ∥ 04 ∥ 05) → 06 → 07 → 0
 | WP-10 (deuda técnica) | ✅ aprobado (commit) — ver `docs/revisiones/WP-10-revision.md` |
 | WP-11 v2 (programas oncología + disposición estructurada) | ✅ aprobado (commit) — ver `docs/revisiones/WP-11-revision.md` |
 | WP-17 + WP-15 (dashboard patrocinador + demo + ROI) | ✅ aprobado (commit) — ver `docs/revisiones/WP-17-revision.md`. **Demo vendible lista** (`docs/DEMO-GUION.md`) |
-| WP-16 (termómetro NCCN) | ▶️ siguiente (armazón; umbral ← llamada 1) |
-| WP-09 (aplicar migraciones al Supabase en vivo + E2E) | ▶️ desbloqueado (claves en .env.local; BD vacía) |
+| WP-16 (termómetro NCCN) | ✅ aprobado (commit) — ver `docs/revisiones/WP-16-revision.md` |
+| WP-09 (aplicar migraciones al Supabase en vivo + E2E) | ▶️ EN CURSO (claves en .env.local; BD vacía) |
 | WP-16 (termómetro NCCN) · WP-17 (dashboard patrocinador + demo) · WP-15 (ROI) | ⏳ specs en PLAN-TECNICO §5; fin sprint 2 = demo vendible |
 | WP-18 (farmacovigilancia) | ⏳ puerta: primera LOI farma |
 | WP-19 (cuidador-proxy pediátrico) | ⏳ puerta: asociación/fundación |

@@ -30,6 +30,7 @@ import {
   aEsquemaJson,
   esquemaFinalizarCheckin,
   esquemaMarcarDominioCubierto,
+  esquemaRegistrarInstrumento,
   esquemaRegistrarObservacion,
   esquemaRegistrarToma,
   esquemaSenalAlarma,
@@ -105,6 +106,20 @@ export type ProgramaContexto = {
   guiaVocabulario?: string;
 };
 
+/**
+ * Estado del instrumento (Termómetro de Distrés NCCN, WP-16) para el check-in de
+ * hoy. Presente solo cuando el programa lo tiene ACTIVO. `administrar` = activo y
+ * TOCA hoy según la frecuencia y el último registro: solo entonces el guion lo
+ * introduce y se ofrece la tool.
+ */
+export type InstrumentoContexto = {
+  clave: "termometro_distres_nccn";
+  administrar: boolean;
+  frecuencia: "semanal" | "quincenal" | "ninguna";
+  /** Puntuación (referencia NCCN) a partir de la cual recorrer los problemas. */
+  umbralProblemas: number;
+};
+
 export type ContextoCheckin = {
   pacienteId: string;
   nombre: string;
@@ -119,6 +134,8 @@ export type ContextoCheckin = {
   dominiosCubiertos: DominioCheckin[];
   /** Programa activo que dirige el check-in (null/ausente = comportamiento F1). */
   programa?: ProgramaContexto | null;
+  /** Instrumento a administrar hoy (WP-16); null/ausente = no aplica. */
+  instrumento?: InstrumentoContexto | null;
 };
 
 /** Extrae los dominios de checklist marcados en `checkins.dominios_cubiertos`. */
@@ -197,15 +214,24 @@ export async function construirContexto(
     .eq("fecha", fechaHoy)
     .maybeSingle();
 
-  // Programa de monitorización activo (WP-11 v2). Carga DIFERIDA del módulo de
-  // servidor para no arrastrar `server-only` a bundles de cliente ni a tests.
-  // Sin programa → `null` → el check-in se comporta como en F1.
+  // Programa de monitorización activo (WP-11 v2) + instrumento de hoy (WP-16).
+  // Carga DIFERIDA del módulo de servidor para no arrastrar `server-only` a
+  // bundles de cliente ni a tests. Sin programa → `null` → check-in como en F1.
   let programa: ProgramaContexto | null = null;
+  let instrumento: InstrumentoContexto | null = null;
   try {
-    const { obtenerContextoPrograma } = await import("@/lib/programas/servidor");
+    const { obtenerContextoPrograma, obtenerContextoInstrumento } = await import(
+      "@/lib/programas/servidor"
+    );
     programa = await obtenerContextoPrograma(supabase, pacienteId);
+    instrumento = await obtenerContextoInstrumento(
+      supabase,
+      pacienteId,
+      fechaHoy,
+    );
   } catch {
     programa = null;
+    instrumento = null;
   }
 
   return {
@@ -235,6 +261,7 @@ export async function construirContexto(
       checkinHoy?.dominios_cubiertos ?? null,
     ),
     programa,
+    instrumento,
   };
 }
 
@@ -355,6 +382,25 @@ ${preguntas}${vocab}
 }
 
 /**
+ * Sección `# TERMÓMETRO DE DISTRÉS` del system prompt (WP-16). Vacía salvo cuando
+ * TOCA administrar hoy. Botsy ADMINISTRA y REGISTRA el instrumento; NO interpreta
+ * el resultado ante la persona ni diagnostica (reglas de oro 1 y 4 de CLAUDE.md).
+ */
+function seccionInstrumento(
+  instrumento: InstrumentoContexto | null | undefined,
+): string {
+  if (!instrumento || !instrumento.administrar) return "";
+  return `
+# TERMÓMETRO DE DISTRÉS (una vez, con naturalidad)
+Hoy toca el termómetro de malestar. Introdúcelo con calidez, en un solo turno:
+- Pregunta: "De 0 a 10, ¿cuánto malestar o angustia has sentido esta última semana? (0 es nada y 10 es el máximo)".
+- Registra SIEMPRE la respuesta con registrar_instrumento (instrumento "termometro_distres_nccn", puntuacion 0–10).
+- SOLO si la puntuación es ${instrumento.umbralProblemas} o más, pregunta con delicadeza por las áreas que le están preocupando y marca las que confirme, en 'problemas' (categorías: prácticos, familiares, emocionales, físicos, espirituales). Si la puntuación es baja, NO recorras la lista (no alargues el check-in).
+- NO interpretes ni pongas nombre al resultado ante la persona ("esto indica...", "tienes distrés" están PROHIBIDOS). No es un diagnóstico. Agradece con calma y sigue.
+`;
+}
+
+/**
  * System prompt en español que implementa el flujo §2.2 y las reglas clínicas
  * innegociables de CLAUDE.md. Función pura (testeable sin red ni BD).
  */
@@ -370,6 +416,7 @@ export function construirInstrucciones(contexto: ContextoCheckin): string {
       ? contexto.condiciones.join(", ")
       : "sin condiciones registradas";
   const bloquePrograma = seccionPrograma(contexto.programa);
+  const bloqueInstrumento = seccionInstrumento(contexto.instrumento);
 
   return `Eres Botsy, un asistente de salud que acompaña a la persona en su check-in DIARIO. Hablas en español de España (es-ES), con tono cálido, cercano y sencillo. La persona puede ser mayor: usa frases CORTAS, vocabulario claro, y haz UNA sola pregunta por turno. Nunca escribas párrafos largos.
 
@@ -394,7 +441,7 @@ ${pendientes}
 
 ## Dominios YA cubiertos hoy (NO vuelvas a preguntar por ellos)
 ${hechos}
-
+${bloqueInstrumento}
 # Cómo conducir la conversación (flujo)
 1. Escucha abierta: si la persona ya cuenta algo espontáneamente (dolor, ánimo, si tomó su medicación...), EXTRÁELO con las herramientas y NO vuelvas a preguntarlo.
 2. Recorre solo los dominios pendientes, de uno en uno, con preguntas naturales.
@@ -460,6 +507,31 @@ export const TOOLS_CHECKIN: readonly DefinicionToolNeutra[] = [
     parametros: aEsquemaJson(esquemaFinalizarCheckin),
   },
 ] as const;
+
+/**
+ * Tool del Termómetro de Distrés NCCN (WP-16). Se ofrece SOLO cuando el
+ * instrumento se administra hoy (ver `construirToolsCheckin`).
+ */
+export const TOOL_REGISTRAR_INSTRUMENTO: DefinicionToolNeutra = {
+  nombre: "registrar_instrumento",
+  descripcion:
+    "Registra la respuesta del termómetro de distrés (puntuación 0–10 y, solo si es alta, la lista de problemas marcados). Úsala una vez cuando toque el termómetro.",
+  parametros: aEsquemaJson(esquemaRegistrarInstrumento),
+};
+
+/**
+ * Lista de tools del check-in. Base compartida (F1) + la tool del instrumento
+ * SOLO cuando toca administrarlo hoy (gating WP-16: si no se ofrece, el modelo
+ * no puede llamarla). El loop añade además la defensa en profundidad en
+ * `ejecutarHerramienta`.
+ */
+export function construirToolsCheckin(opciones?: {
+  instrumento?: boolean;
+}): DefinicionToolNeutra[] {
+  const base: DefinicionToolNeutra[] = [...TOOLS_CHECKIN];
+  if (opciones?.instrumento === true) base.push(TOOL_REGISTRAR_INSTRUMENTO);
+  return base;
+}
 
 export const NOMBRES_TOOLS = TOOLS_CHECKIN.map((t) => t.nombre);
 

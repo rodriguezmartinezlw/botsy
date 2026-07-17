@@ -245,6 +245,14 @@ export function describirCondicion(cond: Condicion): string {
       const r = rango(cond.valor_num_gte, cond.valor_num_lte);
       return `${nombreDominio(cond.dominio)} ${r} durante ${cond.dias_consecutivos} día(s) seguidos`;
     }
+    case "instrumento": {
+      const r = rango(cond.puntuacion_gte, cond.puntuacion_lte);
+      const nombre =
+        cond.instrumento === "termometro_distres_nccn"
+          ? "termómetro de distrés"
+          : cond.instrumento.replace(/_/g, " ");
+      return `${nombre}${r ? ` ${r}` : " registrado"}`;
+    }
     case "combinacion": {
       const todas = (cond.todas ?? []).map(describirCondicion);
       const alguna = (cond.alguna ?? []).map(describirCondicion);

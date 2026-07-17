@@ -32,6 +32,8 @@ export type CheckinVoz = {
   fecha: string;
   dominiosCubiertos: DominioCheckin[];
   vertical: string | null;
+  /** ¿Se administra hoy el instrumento? (WP-16). Gating de `registrar_instrumento`. */
+  instrumentoActivo: boolean;
 };
 
 /** Repositorio de turno + lectura del estado derivado (idéntico al modo texto). */
@@ -112,6 +114,7 @@ export async function manejarToolVoz(
     vertical: checkin.vertical,
     dominiosYaCubiertos: checkin.dominiosCubiertos,
     reglasSenal,
+    instrumentoActivo: checkin.instrumentoActivo,
   });
 
   const riesgo = obtenerRiesgo();

@@ -14,6 +14,7 @@ import { describe, expect, it } from "vitest";
 import type { NivelRiesgo } from "@/types/db";
 import { nivelMaximoRiesgo, type ReglaSenal } from "@/lib/escalado/senales";
 import type {
+  InstrumentoEntrada,
   ObservacionEntrada,
   RepositorioCheckin,
   SenalEntrada,
@@ -46,6 +47,7 @@ function checkinFake(overrides: Partial<CheckinVoz> = {}): CheckinVoz {
     fecha: "2026-07-15",
     dominiosCubiertos: [],
     vertical: "cardiovascular",
+    instrumentoActivo: false,
     ...overrides,
   };
 }
@@ -57,6 +59,7 @@ function crearPuertoFake(config: {
   const observaciones: ObservacionEntrada[] = [];
   const tomas: TomaEntrada[] = [];
   const senales: SenalEntrada[] = [];
+  const instrumentos: InstrumentoEntrada[] = [];
   const dominios = new Set<DominioCheckin>(config.checkin?.dominiosCubiertos ?? []);
   let riesgo: NivelRiesgo | null = config.checkin?.riesgo ?? null;
   let escaladoLlamado = 0;
@@ -74,6 +77,9 @@ function crearPuertoFake(config: {
     async registrarSenal(s) {
       senales.push(s);
       riesgo = nivelMaximoRiesgo(riesgo, s.nivel);
+    },
+    async registrarInstrumento(i) {
+      instrumentos.push(i);
     },
   };
 
@@ -101,6 +107,7 @@ function crearPuertoFake(config: {
     observaciones,
     tomas,
     senales,
+    instrumentos,
     escaladoLlamado: () => escaladoLlamado,
   };
 }

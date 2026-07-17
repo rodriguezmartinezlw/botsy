@@ -20,11 +20,21 @@ import {
   nivelMaximoRiesgo,
   type ReglaSenal,
 } from "@/lib/escalado/senales";
+import {
+  versionInstrumento,
+  type ClaveInstrumento,
+  type OrigenInstrumento,
+} from "@/lib/instrumentos/termometro";
 import type { ClienteOpenAI, LlamadaHerramienta, MensajeLLM } from "./openai";
-import { toolsParaChat, type DominioCheckin } from "./conversacion";
+import {
+  construirToolsCheckin,
+  toolsParaChat,
+  type DominioCheckin,
+} from "./conversacion";
 import {
   esquemaFinalizarCheckin,
   esquemaMarcarDominioCubierto,
+  esquemaRegistrarInstrumento,
   esquemaRegistrarObservacion,
   esquemaRegistrarToma,
   esquemaSenalAlarma,
@@ -50,12 +60,23 @@ export type SenalEntrada = {
   evidencia: Record<string, unknown>;
 };
 
+/** Respuesta de un instrumento administrado en la conversación (WP-16). */
+export type InstrumentoEntrada = {
+  instrumento: ClaveInstrumento;
+  puntuacion: number;
+  problemas: string[];
+  /** Versión trazada del instrumento (la estampa el servidor, no el modelo). */
+  version: string;
+  origen: OrigenInstrumento;
+};
+
 /** Puerto de persistencia del turno (implementado por Supabase o en memoria). */
 export interface RepositorioCheckin {
   registrarObservacion(obs: ObservacionEntrada): Promise<void>;
   registrarToma(toma: TomaEntrada): Promise<void>;
   marcarDominioCubierto(dominio: DominioCheckin): Promise<void>;
   registrarSenal(senal: SenalEntrada): Promise<void>;
+  registrarInstrumento(inst: InstrumentoEntrada): Promise<void>;
 }
 
 export type OpcionesTurno = {
@@ -74,6 +95,13 @@ export type OpcionesTurno = {
      * si no, toda señal se trata de forma conservadora como `contactar`.
      */
     reglasSenal?: readonly ReglaSenal[];
+    /**
+     * ¿Se administra el instrumento (termómetro) en este check-in? (WP-16).
+     * Gating: solo si el programa lo tiene activo Y toca hoy. Cuando es `false`,
+     * la tool `registrar_instrumento` NO se ofrece ni se persiste (defensa en
+     * profundidad, no basta con ocultarla).
+     */
+    instrumentoActivo?: boolean;
   };
   maxIteraciones?: number;
 };
@@ -188,6 +216,29 @@ export async function ejecutarHerramienta(
       return { mensaje: resultado.mensajeParaModelo, riesgo: resultado.nivel };
     }
 
+    case "registrar_instrumento": {
+      // Gating server-side (WP-16): el instrumento solo se administra si el
+      // programa lo tiene activo y toca hoy. No basta con no ofrecer la tool.
+      if (contexto.instrumentoActivo !== true) {
+        return {
+          mensaje:
+            "ERROR: el instrumento no está activo hoy para esta persona; no lo administres.",
+        };
+      }
+      const r = esquemaRegistrarInstrumento.safeParse(args);
+      if (!r.success) {
+        return { mensaje: `ERROR de validación: ${r.error.message}. Corrige y reintenta.` };
+      }
+      await repositorio.registrarInstrumento({
+        instrumento: r.data.instrumento,
+        puntuacion: r.data.puntuacion,
+        problemas: r.data.problemas ?? [],
+        version: versionInstrumento(r.data.instrumento),
+        origen: "conversacional",
+      });
+      return { mensaje: "Instrumento registrado." };
+    }
+
     case "finalizar_checkin": {
       const r = esquemaFinalizarCheckin.safeParse(args);
       if (!r.success) {
@@ -217,7 +268,10 @@ export async function ejecutarTurno(
 ): Promise<ResultadoTurno> {
   const { cliente, modelo, instrucciones, repositorio, contexto } = opciones;
   const maxIteraciones = opciones.maxIteraciones ?? 6;
-  const herramientas = toolsParaChat();
+  // Solo se ofrece la tool del instrumento cuando se administra hoy (WP-16).
+  const herramientas = toolsParaChat(
+    construirToolsCheckin({ instrumento: contexto.instrumentoActivo === true }),
+  );
 
   const mensajes: MensajeLLM[] = [
     { rol: "system", contenido: instrucciones },

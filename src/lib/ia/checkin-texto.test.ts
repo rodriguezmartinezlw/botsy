@@ -17,6 +17,7 @@ import type {
 } from "@/lib/ia/openai";
 import {
   ejecutarTurno,
+  type InstrumentoEntrada,
   type ObservacionEntrada,
   type RepositorioCheckin,
   type SenalEntrada,
@@ -62,6 +63,7 @@ function repoMemoria(riesgoInicial: NivelRiesgo | null = null) {
   const tomas: TomaEntrada[] = [];
   const dominios = new Set<DominioCheckin>();
   const senales: SenalEntrada[] = [];
+  const instrumentos: InstrumentoEntrada[] = [];
   let riesgo = riesgoInicial;
 
   const repositorio: RepositorioCheckin = {
@@ -78,6 +80,9 @@ function repoMemoria(riesgoInicial: NivelRiesgo | null = null) {
       senales.push(s);
       riesgo = nivelMaximoRiesgo(riesgo, s.nivel);
     },
+    async registrarInstrumento(i) {
+      instrumentos.push(i);
+    },
   };
 
   return {
@@ -86,6 +91,7 @@ function repoMemoria(riesgoInicial: NivelRiesgo | null = null) {
     tomas,
     dominios,
     senales,
+    instrumentos,
     obtenerRiesgo: () => riesgo,
   };
 }

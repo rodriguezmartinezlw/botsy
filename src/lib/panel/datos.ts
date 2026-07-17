@@ -36,6 +36,11 @@ import {
 import { configEfectiva } from "@/lib/programas/config";
 import { describirConfig } from "@/lib/programas/describir";
 import {
+  problemasFrecuentes,
+  serieDistres,
+  type RespuestaDistres,
+} from "@/lib/instrumentos/termometro";
+import {
   calcularEdad,
   diasSinCheckin,
   nivelSemaforo,
@@ -46,6 +51,7 @@ import type {
   AlertaDetalle,
   DesenlacePendienteVista,
   DisposicionVista,
+  DistresTendencia,
   FichaPaciente,
   ItemTimeline,
   MotivoCatalogo,
@@ -54,7 +60,7 @@ import type {
   ReglaVista,
   TendenciasCompactas,
 } from "./tipos";
-import type { VerticalPaciente } from "@/types/db";
+import type { Json, VerticalPaciente } from "@/types/db";
 
 const ZONA_POR_DEFECTO = "Europe/Madrid";
 
@@ -202,11 +208,44 @@ function reglaAVista(fila: {
   };
 }
 
+/** Coacciona el jsonb `items` de una respuesta de instrumento a lista de códigos. */
+function itemsAProblemas(items: Json | null): string[] {
+  if (!Array.isArray(items)) return [];
+  return items.filter((x): x is string => typeof x === "string");
+}
+
+/**
+ * Bloque del Termómetro de Distrés (WP-16): serie temporal + media + última
+ * puntuación + problemas más frecuentes. `null` si el paciente no tiene ninguna
+ * respuesta registrada (no se muestra la tarjeta).
+ */
+function construirDistres(
+  hoy: string,
+  respuestas: RespuestaDistres[],
+): DistresTendencia | null {
+  if (respuestas.length === 0) return null;
+  const rango = rangoPeriodo("tres_meses", hoy);
+  const serie = serieDistres(respuestas, rango);
+  const ordenadas = [...respuestas].sort((a, b) => a.fecha.localeCompare(b.fecha));
+  const ultima = ordenadas[ordenadas.length - 1]?.puntuacion ?? null;
+  return {
+    serie,
+    media: mediaSerie(serie),
+    ultima,
+    problemas: problemasFrecuentes(respuestas).map((p) => ({
+      codigo: p.codigo,
+      etiqueta: p.etiqueta,
+      recuento: p.recuento,
+    })),
+  };
+}
+
 function construirTendencias(
   hoy: string,
   obsFechadas: ObservacionFechada[],
   pautasActivas: { id: string; farmaco: string; dosis: string | null; critica: boolean }[],
   tomasFechadas: TomaFechada[],
+  respuestasDistres: RespuestaDistres[],
 ): TendenciasCompactas {
   const rango = rangoPeriodo("mes", hoy);
   const rangoPrev = rangoAnterior("mes", hoy);
@@ -239,6 +278,7 @@ function construirTendencias(
     },
     animo: seriesAnimoEstres(obsFechadas, rango),
     farmacos,
+    distres: construirDistres(hoy, respuestasDistres),
   };
 }
 
@@ -330,6 +370,22 @@ export async function cargarFichaPaciente(
       fecha: t.fecha,
       estado: t.estado,
       pautaId: t.pauta_id,
+    }));
+
+    // Respuestas del Termómetro de Distrés (WP-16). Fecha = del check-in si lo
+    // hay; si no, la de creación. RLS: sólo las de sus pacientes.
+    const { data: instrumentos } = await supabase
+      .from("instrumentos_respuestas")
+      .select("checkin_id, puntuacion, items, creado_en")
+      .eq("paciente_id", pacienteId)
+      .eq("instrumento", "termometro_distres_nccn")
+      .order("creado_en", { ascending: true });
+    const respuestasDistres: RespuestaDistres[] = (instrumentos ?? []).map((r) => ({
+      fecha:
+        (r.checkin_id ? fechaPorCheckin.get(r.checkin_id) : null) ??
+        r.creado_en.slice(0, 10),
+      puntuacion: Number(r.puntuacion),
+      problemas: itemsAProblemas(r.items),
     }));
 
     const { data: alertas } = await supabase
@@ -449,6 +505,7 @@ export async function cargarFichaPaciente(
         critica: p.critica,
       })),
       tomasFechadas,
+      respuestasDistres,
     );
 
     return {

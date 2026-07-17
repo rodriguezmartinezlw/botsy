@@ -12,6 +12,7 @@ import type { BaseDatos, Json, NivelRiesgo } from "@/types/db";
 import { nivelMaximoRiesgo } from "@/lib/escalado/senales";
 import type { DominioCheckin } from "./conversacion";
 import type {
+  InstrumentoEntrada,
   ObservacionEntrada,
   RepositorioCheckin,
   SenalEntrada,
@@ -103,6 +104,21 @@ export function crearRepositorioSupabase(deps: DepsRepositorio): {
           evidencia: senal.evidencia as Json,
         },
       });
+    },
+
+    async registrarInstrumento(inst: InstrumentoEntrada): Promise<void> {
+      // Escribe como el PACIENTE (RLS `propio`). La versión y el origen los
+      // estampa el servidor (integridad del dato para RWE).
+      const { error } = await supabase.from("instrumentos_respuestas").insert({
+        paciente_id: pacienteId,
+        checkin_id: checkinId,
+        instrumento: inst.instrumento,
+        version_instrumento: inst.version,
+        puntuacion: inst.puntuacion,
+        items: inst.problemas as unknown as Json,
+        origen: inst.origen,
+      });
+      if (error) throw new Error("No se pudo registrar el instrumento.");
     },
   };
 

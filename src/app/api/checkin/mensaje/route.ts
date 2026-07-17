@@ -127,6 +127,7 @@ export async function POST(request: Request): Promise<Response> {
           vertical: contexto.vertical,
           dominiosYaCubiertos: dominiosPrevios,
           reglasSenal,
+          instrumentoActivo: contexto.instrumento?.administrar === true,
         },
       });
     } catch {

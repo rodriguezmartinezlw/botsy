@@ -102,11 +102,34 @@ export type FarmacoTendencia = {
   adherencia7: number | null;
 };
 
+/** Problema del termómetro con su recuento (para el bloque de más frecuentes). */
+export type ProblemaDistresVista = {
+  codigo: string;
+  etiqueta: string;
+  recuento: number;
+};
+
+/**
+ * Serie temporal del Termómetro de Distrés NCCN (WP-16) + problemas más
+ * frecuentes, para la ficha 360º. Es una vista PROFESIONAL: Botsy no interpreta
+ * el resultado ante el paciente (reglas de oro 1 y 4). `null` si el paciente no
+ * tiene ninguna respuesta registrada.
+ */
+export type DistresTendencia = {
+  serie: SeriePunto[];
+  media: number | null;
+  /** Última puntuación registrada (0–10). */
+  ultima: number | null;
+  problemas: ProblemaDistresVista[];
+};
+
 export type TendenciasCompactas = {
   hoy: string;
   dolor: { serie: SeriePunto[]; media: number | null; delta: number | null };
   animo: PuntoAnimo[];
   farmacos: FarmacoTendencia[];
+  /** Termómetro de distrés (WP-16); `null` si no hay registros. */
+  distres: DistresTendencia | null;
 };
 
 // --- Medicación --------------------------------------------------------------

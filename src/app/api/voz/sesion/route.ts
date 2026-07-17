@@ -22,6 +22,7 @@ import {
 import {
   construirContexto,
   construirInstrucciones,
+  construirToolsCheckin,
   fechaHoyEnZona,
   toolsParaRealtime,
 } from "@/lib/ia/conversacion";
@@ -111,10 +112,15 @@ export async function POST(): Promise<Response> {
       return respuestaError("Tu check-in de hoy ya está cerrado.", 409);
     }
 
-    // Instrucciones + tools con el builder compartido de WP-02.
+    // Instrucciones + tools con el builder compartido de WP-02. La tool del
+    // termómetro (WP-16) solo se ofrece cuando toca administrarlo hoy.
     const contexto = await construirContexto(user.id);
     const instrucciones = construirInstrucciones(contexto);
-    const tools = toolsParaRealtime();
+    const tools = toolsParaRealtime(
+      construirToolsCheckin({
+        instrumento: contexto.instrumento?.administrar === true,
+      }),
+    );
 
     // Token efímero (server-side). Si falta la API key o el proveedor falla,
     // se traduce a un 503 amable (la UI ofrece el modo texto como alternativa).

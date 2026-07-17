@@ -18,6 +18,7 @@ import { esquemaCuerpoToolVoz } from "@/lib/ia/schemas";
 import { crearRepositorioSupabase } from "@/lib/ia/repositorio-supabase";
 import { manejarToolVoz, type PuertoToolVoz } from "@/lib/ia/voz-tool";
 import { parsearDominiosCubiertos } from "@/lib/ia/conversacion";
+import { obtenerContextoInstrumento } from "@/lib/programas/servidor";
 import { cargarReglasSenal, evaluarCheckin } from "@/lib/escalado/motor";
 import {
   aplicarEscalado,
@@ -60,6 +61,13 @@ export async function POST(request: Request): Promise<Response> {
           .eq("id", userId)
           .maybeSingle();
 
+        // ¿Se administra hoy el instrumento? (WP-16). Gating de la tool.
+        const instrumento = await obtenerContextoInstrumento(
+          supabase,
+          userId,
+          checkin.fecha,
+        );
+
         return {
           id: checkin.id,
           pacienteId: userId,
@@ -68,6 +76,7 @@ export async function POST(request: Request): Promise<Response> {
           fecha: checkin.fecha,
           dominiosCubiertos: parsearDominiosCubiertos(checkin.dominios_cubiertos),
           vertical: paciente?.vertical ?? null,
+          instrumentoActivo: instrumento?.administrar === true,
         };
       },
 

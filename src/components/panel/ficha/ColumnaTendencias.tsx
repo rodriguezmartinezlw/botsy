@@ -1,4 +1,4 @@
-import { Activity, Pill, Smile } from "lucide-react";
+import { Activity, Pill, Smile, Thermometer } from "lucide-react";
 import GraficoAreaTemporal from "@/components/graficos/GraficoAreaTemporal";
 import GraficoLineas, { type LineaConfig } from "@/components/graficos/GraficoLineas";
 import PuntosAdherencia from "@/components/graficos/PuntosAdherencia";
@@ -52,7 +52,7 @@ export default function ColumnaTendencias({
 }: {
   tendencias: TendenciasCompactas;
 }) {
-  const { dolor, animo, farmacos } = tendencias;
+  const { dolor, animo, farmacos, distres } = tendencias;
 
   return (
     <div className="flex flex-col gap-4">
@@ -94,6 +94,49 @@ export default function ColumnaTendencias({
           <EstadoVacioGrafico mensaje="Sin registros emocionales este mes." />
         )}
       </TarjetaCompacta>
+
+      {distres ? (
+        <TarjetaCompacta
+          titulo="Termómetro de distrés"
+          icono={<Thermometer className="h-5 w-5" aria-hidden />}
+          extra={
+            distres.ultima !== null ? (
+              <span className="text-lg font-bold text-texto">
+                {distres.ultima}
+                <span className="text-sm font-normal text-texto-tenue">/10</span>
+              </span>
+            ) : null
+          }
+        >
+          <GraficoAreaTemporal
+            datos={distres.serie}
+            color={PALETA.cognicion}
+            maxY={10}
+            unidad="/10"
+            marcarPico
+            etiquetaSerie="Distrés"
+            mensajeVacio="Sin registros del termómetro."
+          />
+          {distres.problemas.length > 0 ? (
+            <div className="flex flex-col gap-2">
+              <span className="text-xs font-medium text-texto-tenue">
+                Problemas más frecuentes
+              </span>
+              <ul className="flex flex-wrap gap-2">
+                {distres.problemas.map((p) => (
+                  <li
+                    key={p.codigo}
+                    className="inline-flex items-center gap-1 rounded-full bg-superficie-suave px-2 py-0.5 text-xs font-medium text-texto"
+                  >
+                    {p.etiqueta}
+                    <span className="text-texto-tenue">×{p.recuento}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </TarjetaCompacta>
+      ) : null}
 
       <TarjetaCompacta
         titulo="Adherencia"

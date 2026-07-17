@@ -58,12 +58,25 @@ export type CondCombinacion = {
   todas?: Condicion[];
   alguna?: Condicion[];
 };
+/**
+ * Condición sobre un INSTRUMENTO administrado (WP-16). Casa cuando existe una
+ * respuesta del instrumento indicado en el check-in con puntuación dentro del
+ * rango. El umbral (`puntuacion_gte`) es CONFIGURABLE y [PENDIENTE CLÍNICO]: vive
+ * en la regla de programa, no en el motor.
+ */
+export type CondInstrumento = {
+  tipo: "instrumento";
+  instrumento: string;
+  puntuacion_gte?: number;
+  puntuacion_lte?: number;
+};
 export type Condicion =
   | CondObservacion
   | CondSenal
   | CondAdherencia
   | CondTendencia
-  | CondCombinacion;
+  | CondCombinacion
+  | CondInstrumento;
 
 const esquemaCondObservacion = z
   .object({
@@ -96,6 +109,15 @@ const esquemaCondTendencia = z
   })
   .strict();
 
+const esquemaCondInstrumento = z
+  .object({
+    tipo: z.literal("instrumento"),
+    instrumento: z.string().min(1),
+    puntuacion_gte: z.number().optional(),
+    puntuacion_lte: z.number().optional(),
+  })
+  .strict();
+
 /** Esquema recursivo: `combinacion` anida condiciones. */
 export const esquemaCondicion: z.ZodType<Condicion> = z.lazy(
   (): z.ZodType<Condicion> =>
@@ -104,6 +126,7 @@ export const esquemaCondicion: z.ZodType<Condicion> = z.lazy(
       esquemaCondSenal,
       esquemaCondAdherencia,
       esquemaCondTendencia,
+      esquemaCondInstrumento,
       esquemaCondCombinacion,
     ]) as unknown as z.ZodType<Condicion>,
 );
@@ -146,6 +169,12 @@ export type DiaAdherencia = {
   omitida: boolean;
 };
 
+/** Respuesta de un instrumento en el check-in evaluado (WP-16). */
+export type InstrumentoEval = {
+  instrumento: string;
+  puntuacion: number;
+};
+
 export type DatosEvaluacion = {
   /** Vertical del paciente; filtra las reglas acotadas por vertical. */
   vertical: string | null;
@@ -157,6 +186,11 @@ export type DatosEvaluacion = {
   historico: PuntoHistorico[];
   /** Adherencia a fármacos críticos por día (para `adherencia_critica`). */
   adherenciaCritica: DiaAdherencia[];
+  /**
+   * Respuestas de instrumentos del check-in (para `instrumento`, WP-16).
+   * Opcional: los datos construidos antes de WP-16 siguen siendo válidos.
+   */
+  instrumentos?: InstrumentoEval[];
 };
 
 export type ReglaEvaluable = {
@@ -334,6 +368,37 @@ function evalTendencia(
   };
 }
 
+function evalInstrumento(
+  datos: DatosEvaluacion,
+  cond: CondInstrumento,
+): EvaluacionCond {
+  const matches = (datos.instrumentos ?? []).filter((r) => {
+    if (r.instrumento !== cond.instrumento) return false;
+    if (cond.puntuacion_gte !== undefined && !(r.puntuacion >= cond.puntuacion_gte)) {
+      return false;
+    }
+    if (cond.puntuacion_lte !== undefined && !(r.puntuacion <= cond.puntuacion_lte)) {
+      return false;
+    }
+    return true;
+  });
+  if (matches.length === 0) return SIN_MATCH;
+  const rango = [
+    cond.puntuacion_gte !== undefined ? `>= ${cond.puntuacion_gte}` : null,
+    cond.puntuacion_lte !== undefined ? `<= ${cond.puntuacion_lte}` : null,
+  ]
+    .filter(Boolean)
+    .join(" y ");
+  return {
+    match: true,
+    observaciones: [],
+    senales: [],
+    detalle: [
+      `Instrumento ${cond.instrumento}${rango ? ` (puntuación ${rango})` : ""}.`,
+    ],
+  };
+}
+
 function evalCombinacion(
   datos: DatosEvaluacion,
   cond: CondCombinacion,
@@ -371,6 +436,8 @@ function evaluarCondicion(
       return evalAdherencia(datos, cond);
     case "tendencia":
       return evalTendencia(datos, cond);
+    case "instrumento":
+      return evalInstrumento(datos, cond);
     case "combinacion":
       return evalCombinacion(datos, cond);
   }
@@ -522,6 +589,7 @@ async function cargarDatosEvaluacion(
     { data: eventos },
     { data: checkinsRecientes },
     { data: pautasCriticas },
+    { data: instrumentos },
   ] = await Promise.all([
     supabase
       .from("observaciones")
@@ -545,6 +613,13 @@ async function cargarDatosEvaluacion(
       .eq("paciente_id", pacienteId)
       .eq("critica", true)
       .eq("activa", true),
+    // Instrumentos administrados en este check-in (WP-16). Best-effort: si la
+    // consulta falla, `instrumentos` queda vacío y las reglas de instrumento no
+    // disparan (nunca rompe la evaluación del resto).
+    supabase
+      .from("instrumentos_respuestas")
+      .select("instrumento, puntuacion")
+      .eq("checkin_id", checkinId),
   ]);
 
   const senales: string[] = [];
@@ -606,6 +681,10 @@ async function cargarDatosEvaluacion(
     senales,
     historico,
     adherenciaCritica,
+    instrumentos: (instrumentos ?? []).map((r) => ({
+      instrumento: r.instrumento,
+      puntuacion: Number(r.puntuacion),
+    })),
   };
 }
 
