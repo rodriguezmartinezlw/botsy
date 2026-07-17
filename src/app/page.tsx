@@ -37,6 +37,13 @@ export default function Home() {
               Soy profesional
             </Link>
           </div>
+
+          <Link
+            href="/login?rol=patrocinador"
+            className="text-base font-medium text-texto-tenue underline-offset-4 transition-colors hover:text-texto hover:underline"
+          >
+            Soy patrocinador
+          </Link>
         </div>
       </main>
 

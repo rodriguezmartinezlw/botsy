@@ -98,6 +98,39 @@ export async function contarAlertasNuevas(): Promise<number> {
 }
 
 // =====================================================================
+// Catálogo de programas activos (para el alta de pacientes, WP-20 §A).
+// =====================================================================
+
+export type PlantillaProgramaLista = {
+  clave: string;
+  nombre: string;
+  descripcion: string | null;
+};
+
+/** Programas activos del catálogo, para el desplegable del alta. Nunca lanza. */
+export async function listarProgramasActivos(): Promise<PlantillaProgramaLista[]> {
+  try {
+    const supabase = await crearClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data } = await supabase
+      .from("programas")
+      .select("clave, nombre, descripcion")
+      .eq("activo", true)
+      .order("nombre", { ascending: true });
+    return (data ?? []).map((p) => ({
+      clave: p.clave,
+      nombre: p.nombre,
+      descripcion: p.descripcion,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// =====================================================================
 // Lista de pacientes (RF-DB, versión F1).
 // =====================================================================
 

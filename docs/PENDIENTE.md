@@ -28,8 +28,8 @@
 
 | Orden | WP | Qué es | Puerta |
 |---|---|---|---|
-| **1** | [WP-20](wp/WP-20-ux-usabilidad.md) | **UX y usabilidad** — hallazgos de la auditoría 2026-07-17: (A) **enrolamiento de pacientes desde el panel** (CRÍTICO: hoy no se puede dar de alta a una paciente; el auto-registro crea huérfanos sin profesional ni programa), (B) **recuperación de contraseña** (no existe), (C) perfil del paciente editable + hora del recordatorio, (D) iconos PWA reales + estados de carga + QA visual en dispositivo, (E) pasada final de accesibilidad | **Ninguna — programable YA** |
-| 2 | [WP-18](wp/WP-18-farmacovigilancia.md) | Farmacovigilancia mínima viable (EA → cola con SLA 24h → paquete exportable pseudonimizado) | ⛔ Primera LOI farma (el formato del paquete lo fija el contrato) |
+| ✅ | [WP-20](wp/WP-20-ux-usabilidad.md) | **UX y usabilidad** — enrolamiento de pacientes desde el panel (+ vinculación de huérfanos con protección anti-robo), recuperación de contraseña, perfil editable, iconos PWA reales, estados de carga, accesibilidad | **HECHO** (243 tests; `docs/revisiones/WP-20-revision.md`). Config pendiente: añadir `${APP_URL}/restablecer` a las Redirect URLs de Supabase Auth; QA visual en dispositivo |
+| 1 | [WP-18](wp/WP-18-farmacovigilancia.md) | Farmacovigilancia mínima viable (EA → cola con SLA 24h → paquete exportable pseudonimizado) | ⛔ Primera LOI farma (el formato del paquete lo fija el contrato) |
 | 3 | [WP-19](wp/WP-19-cuidador-proxy.md) | Cuidador-proxy pediátrico (titular = adulto; la IA jamás conversa con el menor) | ⛔ Asociación/fundación |
 | ∥ | Deploy a Vercel | `docs/DESPLIEGUE.md` está listo; falta decidir cuenta Vercel y ejecutarlo (cron horario requiere plan Pro). La demo NO lo necesita (corre en local) | Decisión del fundador |
 

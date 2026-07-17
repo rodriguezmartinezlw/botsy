@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame, Home, MessagesSquare, Mic } from "lucide-react";
+import { Flame, Home, MessagesSquare, Mic, UserRoundSearch } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import InterstitialConsentimiento from "@/components/paciente/InterstitialConsentimiento";
 import { crearClienteServidor } from "@/lib/supabase/server";
@@ -19,6 +19,8 @@ type EstadoInicio = {
   rachaActual: number;
   estadoCheckinHoy: EstadoCheckin | null;
   puedeConversar: boolean;
+  vinculado: boolean;
+  email: string;
 };
 
 async function cargarEstado(): Promise<EstadoInicio> {
@@ -27,6 +29,8 @@ async function cargarEstado(): Promise<EstadoInicio> {
     rachaActual: 0,
     estadoCheckinHoy: null,
     puedeConversar: false,
+    vinculado: true,
+    email: "",
   };
   try {
     const supabase = await crearClienteServidor();
@@ -43,7 +47,7 @@ async function cargarEstado(): Promise<EstadoInicio> {
 
     const { data: paciente } = await supabase
       .from("pacientes")
-      .select("racha_actual")
+      .select("racha_actual, profesional_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -68,6 +72,11 @@ async function cargarEstado(): Promise<EstadoInicio> {
       rachaActual: paciente?.racha_actual ?? 0,
       estadoCheckinHoy: checkin?.estado ?? null,
       puedeConversar: puedeConversar(consent),
+      // Si no hay fila de paciente todavía, no mostramos el aviso (evita falsos
+      // positivos ante un backend a medio configurar); solo cuando existe y su
+      // profesional_id es null es realmente un "huérfano".
+      vinculado: paciente ? paciente.profesional_id !== null : true,
+      email: user.email ?? "",
     };
   } catch {
     return porDefecto;
@@ -80,8 +89,14 @@ function primerNombre(nombre: string): string {
 }
 
 export default async function InicioPage() {
-  const { nombre, rachaActual, estadoCheckinHoy, puedeConversar: puede } =
-    await cargarEstado();
+  const {
+    nombre,
+    rachaActual,
+    estadoCheckinHoy,
+    puedeConversar: puede,
+    vinculado,
+    email,
+  } = await cargarEstado();
   const saludoNombre = primerNombre(nombre);
   const completado = estadoCheckinHoy === "completado";
   const enCurso = estadoCheckinHoy === "en_curso";
@@ -90,7 +105,7 @@ export default async function InicioPage() {
     ? "Ya has hecho tu check-in de hoy. ¡Gracias por cuidarte!"
     : enCurso
       ? "Tienes un check-in a medias. ¿Lo terminamos?"
-      : "Aún no has hecho tu check-in de hoy.";
+      : "Aún no has hecho tu check-in de hoy, tu conversación diaria conmigo.";
 
   return (
     <div className="flex flex-col gap-8">
@@ -99,6 +114,35 @@ export default async function InicioPage() {
         descripcion="Este es tu espacio diario. Cuando estés listo, cuéntame cómo te encuentras hoy."
         icono={<Home className="h-6 w-6" aria-hidden />}
       />
+
+      {!vinculado && (
+        <section
+          aria-label="Vinculación con tu equipo de salud"
+          className="flex items-start gap-3 rounded-[var(--radius-lg)] border-2 border-primario bg-primario-suave p-5"
+        >
+          <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-superficie text-primario">
+            <UserRoundSearch className="h-6 w-6" aria-hidden />
+          </span>
+          <div className="flex flex-col gap-1">
+            <p className="text-base font-semibold text-texto">
+              Tu equipo de salud aún no te ha vinculado
+            </p>
+            <p className="text-base text-texto-suave">
+              Para que puedan seguir tus check-ins, dales este correo con el que te
+              registraste:
+            </p>
+            {email ? (
+              <p className="mt-1 break-all rounded-[var(--radius-md)] bg-superficie px-3 py-2 text-base font-semibold text-texto">
+                {email}
+              </p>
+            ) : null}
+            <p className="mt-1 text-sm text-texto-tenue">
+              Puedes seguir haciendo tu check-in mientras tanto; se guardará para
+              cuando te vinculen.
+            </p>
+          </div>
+        </section>
+      )}
 
       {rachaActual > 0 && (
         <section

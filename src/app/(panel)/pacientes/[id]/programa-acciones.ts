@@ -14,57 +14,13 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { obtenerSesionPanel, registrarAuditoria } from "@/lib/panel/sesion-panel";
-import { configEfectiva } from "@/lib/programas/config";
-import type { BaseDatos, Json } from "@/types/db";
+import { sincronizarReglasPrograma } from "@/lib/programas/asignacion";
+import type { Json } from "@/types/db";
 import type { ResultadoAccion } from "@/lib/panel/tipos";
-
-type ClienteBD = SupabaseClient<BaseDatos>;
 
 const FALLO_SESION = "No tienes permiso para esta acción.";
 const FALLO_ESCRITURA = "No se pudo guardar el cambio. Inténtalo de nuevo.";
-
-/**
- * Materializa las reglas clave del programa como reglas del paciente, de forma
- * idempotente: no reinserta una regla cuyo nombre ya exista para esta asignación
- * (WP-11 §A.5). Devuelve cuántas insertó.
- */
-async function sincronizarReglasPrograma(
-  supabase: ClienteBD,
-  pacienteId: string,
-  asignacionId: string,
-  configPrograma: unknown,
-  override: unknown,
-): Promise<number> {
-  const { config } = configEfectiva(configPrograma, override);
-  const reglas = config.escalado.reglas_clave;
-  if (reglas.length === 0) return 0;
-
-  const { data: existentes } = await supabase
-    .from("reglas_escalado")
-    .select("nombre")
-    .eq("programa_paciente_id", asignacionId);
-  const nombresExistentes = new Set((existentes ?? []).map((r) => r.nombre));
-
-  const aInsertar = reglas.filter((r) => !nombresExistentes.has(r.nombre));
-  if (aInsertar.length === 0) return 0;
-
-  const { error } = await supabase.from("reglas_escalado").insert(
-    aInsertar.map((r) => ({
-      paciente_id: pacienteId,
-      vertical: null,
-      nombre: r.nombre,
-      descripcion: r.descripcion ?? null,
-      condicion: r.condicion as unknown as Json,
-      nivel: r.nivel,
-      activa: true,
-      programa_paciente_id: asignacionId,
-    })),
-  );
-  if (error) return 0;
-  return aInsertar.length;
-}
 
 // --- Asignar programa --------------------------------------------------------
 

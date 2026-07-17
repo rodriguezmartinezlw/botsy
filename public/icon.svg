@@ -1,0 +1,11 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Botsy">
+  <rect width="512" height="512" rx="112" fill="#2563EB"/>
+  <g>
+    <!-- Burbuja de conversación -->
+    <rect x="88" y="112" width="336" height="224" rx="60" fill="#FFFFFF"/>
+    <!-- Cola de la burbuja -->
+    <path d="M150 322 L150 404 L216 322 Z" fill="#FFFFFF"/>
+    <!-- Corazón dentro de la burbuja -->
+    <path d="M256 300 C236 276 176 246 176 206 C176 182 196 168 218 168 C236 168 250 180 256 196 C262 180 276 168 294 168 C316 168 336 182 336 206 C336 246 276 276 256 300 Z" fill="#2563EB"/>
+  </g>
+</svg>

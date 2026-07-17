@@ -656,7 +656,7 @@ export default function PantallaVoz({
               : escuchando
                 ? "bg-acento-suave text-acento-fuerte"
                 : "bg-superficie-suave text-texto-tenue"
-          } ${hablando || escuchando ? "animate-pulse" : ""}`}
+          } ${hablando || escuchando ? "animate-pulse motion-reduce:animate-none" : ""}`}
         >
           {hablando ? (
             <Volume2 className="h-12 w-12" aria-hidden />
