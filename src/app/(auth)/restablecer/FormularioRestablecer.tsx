@@ -18,8 +18,12 @@ type EstadoEnlace = "comprobando" | "listo" | "invalido";
  */
 export default function FormularioRestablecer() {
   const router = useRouter();
-  // Instancia estable del cliente (inicializador perezoso: se crea una sola vez).
-  const [supabase] = useState(() => crearClienteNavegador());
+  // El cliente se crea SOLO en el navegador (dentro del efecto): crearlo en el
+  // inicializador de useState rompía el prerender estático cuando las variables
+  // de entorno no existen en build (fallo real del deploy a Vercel, 2026-07-17).
+  const [supabase, setSupabase] = useState<ReturnType<
+    typeof crearClienteNavegador
+  > | null>(null);
 
   const [estadoEnlace, setEstadoEnlace] = useState<EstadoEnlace>("comprobando");
   const [password, setPassword] = useState("");
@@ -29,6 +33,17 @@ export default function FormularioRestablecer() {
 
   useEffect(() => {
     let cancelado = false;
+
+    let cliente: ReturnType<typeof crearClienteNavegador>;
+    try {
+      cliente = crearClienteNavegador();
+    } catch {
+      // Backend sin configurar: fallo controlado, sin romper el render.
+      setEstadoEnlace("invalido");
+      return;
+    }
+    setSupabase(cliente);
+    const supabase = cliente;
 
     const sub = supabase.auth.onAuthStateChange((_evento, session) => {
       if (!cancelado && session) setEstadoEnlace("listo");
@@ -75,11 +90,17 @@ export default function FormularioRestablecer() {
       cancelado = true;
       sub.data.subscription.unsubscribe();
     };
-  }, [supabase]);
+    // Se ejecuta una sola vez al montar (el cliente se crea dentro).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function alEnviar(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
     setError(null);
+    if (!supabase) {
+      setError("No se pudo conectar. Recarga la página e inténtalo de nuevo.");
+      return;
+    }
     const validacion = validarPasswordNueva(password, confirmacion);
     if (!validacion.ok) {
       setError(validacion.error);

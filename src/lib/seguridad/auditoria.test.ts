@@ -152,6 +152,17 @@ describe("Secretos y service-role", () => {
     expect(infractores.map((p) => relative(RAIZ, p))).toEqual([]);
   });
 
+  it("ningún componente crea el cliente de navegador durante el render (prerender-safe)", () => {
+    // Crear el cliente en el cuerpo/useState de un componente rompe el prerender
+    // en build sin variables de entorno (fallo real del deploy a Vercel,
+    // 2026-07-17, /restablecer). Debe crearse dentro de useEffect o de un handler.
+    const infractores = ficherosProd.filter((p) => {
+      const txt = readFileSync(p, "utf8");
+      return /useState\(\s*\(\)\s*=>\s*crearClienteNavegador/.test(txt);
+    });
+    expect(infractores.map((p) => relative(RAIZ, p))).toEqual([]);
+  });
+
   it("ningún componente de cliente importa admin.ts ni el transporte de voz", () => {
     const infractores = ficherosTs.filter((p) => {
       const txt = readFileSync(p, "utf8");
