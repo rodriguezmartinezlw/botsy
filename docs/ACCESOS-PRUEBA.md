@@ -23,7 +23,7 @@ npm run dev
 | **Profesional** | `dr.ruiz@botsy.local` | Dr. Ruiz — Centro Oncológico Norte (ve SOLO a Marta) |
 | **Profesional multi-institución** | `dr.vega@botsy.local` | Dr. Vega — trabaja en A y B (ve ambas) |
 | **Patrocinador** (farma) | `patrocinador@botsy.local` | Solo agregados anonimizados k≥5 |
-| **Admin** | `admin@botsy.local` | Todo (la consola de administración WP-23 está en construcción) |
+| **Admin** | `admin@botsy.local` | Todo + consola de administración en **/admin** (instituciones, profesionales, membresías) |
 
 ## Guion de prueba sugerido (≈30 min)
 
@@ -47,7 +47,7 @@ npm run dev
 - Dashboard: persistencia, adherencia, motivos de discontinuación, tasa de check-in — todo agregado, sin nombres. Informe ROI imprimible. Verás "datos insuficientes" donde la cohorte es <5 (k-anonimato).
 
 ### 4. Como ADMIN (admin@botsy.local)
-- Acceso total al panel. La consola de administración (crear instituciones, invitar profesionales, membresías) es WP-23, en construcción.
+- Ve TODO el panel y además **Administración** (/admin): crea una institución nueva (p. ej. "Clínica Nueva", CO), invita a un profesional por email (usa un email real tuyo para recibirla), asígnale la membresía, y revisa "Pacientes sin institución". Con eso, ese profesional ya puede entrar y enrolar pacientes en su clínica: el ciclo operativo completo.
 
 ## Qué NO va a funcionar aún (esperado)
 

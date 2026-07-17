@@ -33,6 +33,7 @@ export default async function PanelLayout({
       <NavLateral
         alertasNuevas={alertasNuevas}
         desenlacesPendientes={desenlacesPendientes}
+        esAdmin={rol === "admin"}
       />
       <main className="flex-1 px-6 py-8 md:px-10 md:py-10">
         <div className="mx-auto w-full max-w-5xl">{children}</div>

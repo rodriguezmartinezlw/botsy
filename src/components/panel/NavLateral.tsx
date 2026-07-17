@@ -2,29 +2,42 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Users, Bell, Settings, HeartPulse, ClipboardCheck } from "lucide-react";
+import {
+  Users,
+  Bell,
+  Settings,
+  HeartPulse,
+  ClipboardCheck,
+  Shield,
+} from "lucide-react";
 
-const items = [
+const itemsBase = [
   { href: "/pacientes", label: "Pacientes", Icono: Users },
   { href: "/alertas", label: "Alertas", Icono: Bell },
   { href: "/desenlaces", label: "Desenlaces", Icono: ClipboardCheck },
   { href: "/configuracion", label: "Configuración", Icono: Settings },
 ] as const;
 
+const itemAdmin = { href: "/admin", label: "Administración", Icono: Shield } as const;
+
 /**
  * Navegación del panel profesional.
  * Responsive: sidebar fija en escritorio (md+), barra superior en móvil.
  * Cliente: resalta el ítem activo según la ruta y muestra badges con el nº de
- * alertas nuevas (WP-06) y de desenlaces pendientes de registrar (WP-11 v2).
+ * alertas nuevas (WP-06) y de desenlaces pendientes de registrar (WP-11 v2). El
+ * enlace "Administración" (WP-23) sólo aparece para el rol admin.
  */
 export default function NavLateral({
   alertasNuevas = 0,
   desenlacesPendientes = 0,
+  esAdmin = false,
 }: {
   alertasNuevas?: number;
   desenlacesPendientes?: number;
+  esAdmin?: boolean;
 }) {
   const pathname = usePathname();
+  const items = esAdmin ? [...itemsBase, itemAdmin] : itemsBase;
   const badgePorHref: Record<string, number> = {
     "/alertas": alertasNuevas,
     "/desenlaces": desenlacesPendientes,
