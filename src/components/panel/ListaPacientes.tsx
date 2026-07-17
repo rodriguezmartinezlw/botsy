@@ -2,8 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Search } from "lucide-react";
-import { filtrarPacientes, type PacienteLista } from "@/lib/panel/lista";
+import { AlertTriangle, Building2, Search } from "lucide-react";
+import {
+  filtrarPacientes,
+  filtrarPorInstitucion,
+  institucionesDeLista,
+  type PacienteLista,
+} from "@/lib/panel/lista";
 import type { VerticalPaciente } from "@/types/db";
 import Semaforo from "./Semaforo";
 
@@ -46,9 +51,19 @@ function Avatar({ inicial, url }: { inicial: string; url: string | null }) {
 
 export default function ListaPacientes({ pacientes }: { pacientes: PacienteLista[] }) {
   const [consulta, setConsulta] = useState("");
+  const [institucionFiltro, setInstitucionFiltro] = useState("");
+  // WP-22: sólo se ofrece el filtro si el profesional trabaja en varias instituciones.
+  const instituciones = useMemo(
+    () => institucionesDeLista(pacientes),
+    [pacientes],
+  );
   const filtrados = useMemo(
-    () => filtrarPacientes(pacientes, consulta),
-    [pacientes, consulta],
+    () =>
+      filtrarPorInstitucion(
+        filtrarPacientes(pacientes, consulta),
+        institucionFiltro || null,
+      ),
+    [pacientes, consulta, institucionFiltro],
   );
 
   if (pacientes.length === 0) {
@@ -64,20 +79,44 @@ export default function ListaPacientes({ pacientes }: { pacientes: PacienteLista
 
   return (
     <div className="flex flex-col gap-4">
-      <label className="relative block">
-        <span className="sr-only">Buscar paciente por nombre</span>
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-texto-tenue"
-          aria-hidden
-        />
-        <input
-          type="search"
-          value={consulta}
-          onChange={(e) => setConsulta(e.target.value)}
-          placeholder="Buscar por nombre…"
-          className="w-full rounded-[var(--radius-md)] border border-borde bg-superficie py-3 pl-11 pr-4 text-base text-texto placeholder:text-texto-tenue focus:border-primario focus:outline-none"
-        />
-      </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <label className="relative block flex-1">
+          <span className="sr-only">Buscar paciente por nombre</span>
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-texto-tenue"
+            aria-hidden
+          />
+          <input
+            type="search"
+            value={consulta}
+            onChange={(e) => setConsulta(e.target.value)}
+            placeholder="Buscar por nombre…"
+            className="w-full rounded-[var(--radius-md)] border border-borde bg-superficie py-3 pl-11 pr-4 text-base text-texto placeholder:text-texto-tenue focus:border-primario focus:outline-none"
+          />
+        </label>
+
+        {instituciones.length > 1 ? (
+          <label className="relative block sm:w-64">
+            <span className="sr-only">Filtrar por institución</span>
+            <Building2
+              className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-texto-tenue"
+              aria-hidden
+            />
+            <select
+              value={institucionFiltro}
+              onChange={(e) => setInstitucionFiltro(e.target.value)}
+              className="w-full rounded-[var(--radius-md)] border border-borde bg-superficie py-3 pl-11 pr-4 text-base text-texto focus:border-primario focus:outline-none"
+            >
+              <option value="">Todas las instituciones</option>
+              {instituciones.map((i) => (
+                <option key={i.id} value={i.id}>
+                  {i.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+      </div>
 
       {filtrados.length === 0 ? (
         <p className="rounded-[var(--radius-md)] bg-superficie-suave px-4 py-6 text-center text-base text-texto-suave">

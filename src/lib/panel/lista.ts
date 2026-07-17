@@ -32,6 +32,10 @@ export type PacienteLista = {
   diasSinCheckin: number | null;
   /** Nivel de la alerta abierta más grave; `null` = sin alertas abiertas (verde). */
   semaforo: NivelSemaforo;
+  /** Institución del paciente (WP-22); `null` si aún no tiene. */
+  institucionId: string | null;
+  /** Nombre de la institución (para el filtro y la etiqueta); `null` si no consta. */
+  institucionNombre: string | null;
 };
 
 /** Peso de cada nivel para ordenar por gravedad (mayor = más grave). */
@@ -131,4 +135,32 @@ export function filtrarPacientes(
   const q = normalizar(consulta);
   if (q.length === 0) return pacientes;
   return pacientes.filter((p) => normalizar(p.nombre).includes(q));
+}
+
+/**
+ * Filtra por institución (WP-22). `institucionId` vacío/`null` = todas. Sólo tiene
+ * sentido cuando el profesional trabaja en varias instituciones; con una sola, la
+ * lista ya viene acotada por RLS y el filtro es un no-op.
+ */
+export function filtrarPorInstitucion(
+  pacientes: PacienteLista[],
+  institucionId: string | null,
+): PacienteLista[] {
+  if (!institucionId) return pacientes;
+  return pacientes.filter((p) => p.institucionId === institucionId);
+}
+
+/** Instituciones distintas presentes en la lista (para el selector de filtro). */
+export function institucionesDeLista(
+  pacientes: PacienteLista[],
+): { id: string; nombre: string }[] {
+  const vistas = new Map<string, string>();
+  for (const p of pacientes) {
+    if (p.institucionId && !vistas.has(p.institucionId)) {
+      vistas.set(p.institucionId, p.institucionNombre ?? "Institución");
+    }
+  }
+  return [...vistas.entries()]
+    .map(([id, nombre]) => ({ id, nombre }))
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 }

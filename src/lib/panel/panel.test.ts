@@ -13,6 +13,8 @@ import {
   calcularEdad,
   diasSinCheckin,
   filtrarPacientes,
+  filtrarPorInstitucion,
+  institucionesDeLista,
   nivelSemaforo,
   ordenarPacientes,
   type PacienteLista,
@@ -42,6 +44,8 @@ function pac(over: Partial<PacienteLista>): PacienteLista {
     ultimoCheckin: over.ultimoCheckin ?? null,
     diasSinCheckin: over.diasSinCheckin ?? null,
     semaforo: over.semaforo ?? null,
+    institucionId: over.institucionId ?? null,
+    institucionNombre: over.institucionNombre ?? null,
   };
 }
 
@@ -107,6 +111,30 @@ describe("filtrarPacientes — búsqueda por nombre insensible a acentos", () =>
   });
   it("con consulta vacía devuelve todo", () => {
     expect(filtrarPacientes(lista, "  ")).toHaveLength(3);
+  });
+});
+
+// --- Filtro por institución (WP-22) ------------------------------------------
+
+describe("filtrarPorInstitucion / institucionesDeLista — panel por institución", () => {
+  const lista = [
+    pac({ id: "1", nombre: "Ana", institucionId: "A", institucionNombre: "Clínica Lima" }),
+    pac({ id: "2", nombre: "Bea", institucionId: "B", institucionNombre: "Centro Norte" }),
+    pac({ id: "3", nombre: "Cira", institucionId: "A", institucionNombre: "Clínica Lima" }),
+    pac({ id: "4", nombre: "Dora", institucionId: null, institucionNombre: null }),
+  ];
+
+  it("filtra por institución; sin filtro (null) devuelve todo", () => {
+    expect(filtrarPorInstitucion(lista, "A").map((p) => p.id)).toEqual(["1", "3"]);
+    expect(filtrarPorInstitucion(lista, "B").map((p) => p.id)).toEqual(["2"]);
+    expect(filtrarPorInstitucion(lista, null)).toHaveLength(4);
+  });
+
+  it("lista las instituciones distintas (ignora las nulas), ordenadas por nombre", () => {
+    expect(institucionesDeLista(lista)).toEqual([
+      { id: "B", nombre: "Centro Norte" },
+      { id: "A", nombre: "Clínica Lima" },
+    ]);
   });
 });
 

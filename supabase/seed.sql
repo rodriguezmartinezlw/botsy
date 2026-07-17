@@ -4,7 +4,8 @@
 --
 -- Usuarios demo (contraseña común): Botsy1234!
 --   admin@botsy.local          (admin)
---   dra.garcia@botsy.local     (profesional — Dra. García, oncóloga)
+--   dra.garcia@botsy.local     (profesional — Dra. García, oncóloga; Institución A)
+--   dr.vega@botsy.local        (profesional — Dr. Vega; MULTI-INSTITUCIÓN A+B, WP-22)
 --   patrocinador@botsy.local   (patrocinador — "Laboratorio Demo"; SOLO agregados)
 --   maria@botsy.local          (paciente — María, terapia oral · PROTAGONISTA)
 --   carmen@botsy.local         (paciente — Carmen, terapia oral)
@@ -51,6 +52,13 @@ values
    crypt('Botsy1234!', gen_salt('bf')), now(),
    '{"provider":"email","providers":["email"]}'::jsonb,
    '{"rol":"profesional","nombre":"Dra. García"}'::jsonb, now(), now(), '', '', '', '', ''),
+  -- Dr. Vega (WP-22): profesional MULTI-INSTITUCIÓN (trabaja en A y en B); ejercita
+  -- que un profesional en varias instituciones ve a los pacientes de todas ellas.
+  ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000007',
+   'authenticated', 'authenticated', 'dr.vega@botsy.local',
+   crypt('Botsy1234!', gen_salt('bf')), now(),
+   '{"provider":"email","providers":["email"]}'::jsonb,
+   '{"rol":"profesional","nombre":"Dr. Vega"}'::jsonb, now(), now(), '', '', '', '', ''),
   ('00000000-0000-0000-0000-000000000000', '00000000-0000-4000-8000-000000000009',
    'authenticated', 'authenticated', 'patrocinador@botsy.local',
    crypt('Botsy1234!', gen_salt('bf')), now(),
@@ -117,6 +125,7 @@ select
 from auth.users u
 where u.id in (
   '00000000-0000-4000-8000-000000000001','00000000-0000-4000-8000-000000000002',
+  '00000000-0000-4000-8000-000000000007',
   '00000000-0000-4000-8000-000000000009','00000000-0000-4000-8000-000000000003',
   '00000000-0000-4000-8000-000000000004','00000000-0000-4000-8000-000000000011',
   '00000000-0000-4000-8000-000000000012','00000000-0000-4000-8000-000000000013',
@@ -140,12 +149,44 @@ update public.perfiles
 update public.perfiles set telefono = '+34600111222'
   where id = '00000000-0000-4000-8000-000000000002'; -- Dra. García
 
--- El patrocinador financia AMBOS programas de mama.
+-- El patrocinador financia AMBOS programas de mama (toda la cohorte: sin acotar
+-- por país/institución -> pais_codigo/institucion_id quedan NULL = todo, WP-22 §6).
 insert into public.programas_patrocinados (patrocinador_id, programa_id, etiqueta_cohorte, activo)
 select '00000000-0000-4000-8000-000000000a01', p.id, p.nombre, true
 from public.programas p
 where p.clave in ('mama_terapia_oral', 'mama_tratamiento_activo')
 on conflict (patrocinador_id, programa_id) do nothing;
+
+-- ---------------------------------------------------------------------
+-- 2b) País, instituciones y membresías (WP-22).
+--   País: PE (Perú) + CO/BR/ES para el catálogo.
+--   Institución A: "Clínica Oncológica Lima" (PE) -> Dra. García y SUS pacientes.
+--   Institución B: "Centro Oncológico Norte" (PE) -> Dr. Ruiz y Marta (seed_wp06).
+--   Membresías: García->A; Vega->A y B (multi-institución). Ruiz->B en seed_wp06.
+--   Coherente con las asignaciones actuales: se conserva el aislamiento que
+--   verifica acceso_cruzado.sql (García/A no ve a Marta/B; Ruiz/B no ve a los de A).
+-- ---------------------------------------------------------------------
+insert into public.paises (codigo, nombre) values
+  ('PE', 'Perú'),
+  ('CO', 'Colombia'),
+  ('BR', 'Brasil'),
+  ('ES', 'España')
+on conflict (codigo) do nothing;
+
+insert into public.instituciones (id, nombre, tipo, pais_codigo, activa) values
+  ('00000000-0000-4000-8000-000000000b01', 'Clínica Oncológica Lima',  'centro_oncologico', 'PE', true),
+  ('00000000-0000-4000-8000-000000000b02', 'Centro Oncológico Norte',  'centro_oncologico', 'PE', true)
+on conflict (id) do nothing;
+
+-- Membresías: García -> A; Vega -> A y B (multi-institución).
+insert into public.profesionales_instituciones (profesional_id, institucion_id, activa) values
+  ('00000000-0000-4000-8000-000000000002', '00000000-0000-4000-8000-000000000b01', true), -- García -> A
+  ('00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000b01', true), -- Vega -> A
+  ('00000000-0000-4000-8000-000000000007', '00000000-0000-4000-8000-000000000b02', true)  -- Vega -> B
+on conflict (profesional_id, institucion_id) do nothing;
+
+update public.perfiles set telefono = '+34600555777'
+  where id = '00000000-0000-4000-8000-000000000007'; -- Dr. Vega
 
 -- ---------------------------------------------------------------------
 -- 3) Cohorte + 45 días de historial. Un DO block recorre las 10 pacientes:
@@ -157,6 +198,7 @@ on conflict (patrocinador_id, programa_id) do nothing;
 do $$
 declare
   v_garcia      uuid := '00000000-0000-4000-8000-000000000002';
+  v_inst_a      uuid := '00000000-0000-4000-8000-000000000b01'; -- Clínica Oncológica Lima (WP-22)
   v_prog_oral   uuid;
   v_prog_activo uuid;
   v_pac    uuid[] := array[
@@ -212,7 +254,8 @@ begin
       sexo             = 'femenino',
       vertical         = 'general',
       condiciones      = array['Cáncer de mama'],
-      profesional_id   = v_garcia,
+      profesional_id   = v_garcia,       -- médico responsable (contacto/escalado)
+      institucion_id   = v_inst_a,       -- WP-22: pertenencia -> visibilidad por institución
       telefono_medico  = '+34600111222',
       hora_checkin     = '10:00',
       racha_actual     = 12,

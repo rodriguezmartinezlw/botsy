@@ -75,6 +75,13 @@ export type DesenlaceDisposicion =
 export type ClaveInstrumento = "termometro_distres_nccn";
 export type OrigenInstrumento = "conversacional" | "formulario";
 
+// --- Instituciones y país (WP-22) -------------------------------------------
+export type TipoInstitucion =
+  | "hospital"
+  | "clinica"
+  | "centro_oncologico"
+  | "otro";
+
 // --- Filas (Row) ------------------------------------------------------------
 // --- Patrocinadores (WP-17) -------------------------------------------------
 export type TipoPatrocinador = "laboratorio" | "pagador" | "fundacion" | "otro";
@@ -98,12 +105,15 @@ export type Paciente = {
   sexo: string | null;
   vertical: VerticalPaciente;
   condiciones: string[];
+  /** Médico responsable (contacto / escalado). Desde WP-22 NO controla la visibilidad. */
   profesional_id: string | null;
   telefono_medico: string | null;
   hora_checkin: string;
   racha_actual: number;
   racha_maxima: number;
   ultimo_checkin: string | null;
+  /** Institución a la que pertenece el paciente (WP-22). Controla la visibilidad del profesional. */
+  institucion_id: string | null;
   creado_en: string;
 }
 
@@ -311,6 +321,34 @@ export type ProgramaPatrocinado = {
   programa_id: string;
   etiqueta_cohorte: string | null;
   activo: boolean;
+  /** Dimensión país OPCIONAL de la cohorte financiada (WP-22 §6); NULL = todos. */
+  pais_codigo: string | null;
+  /** Dimensión institución OPCIONAL de la cohorte financiada (WP-22 §6); NULL = todas. */
+  institucion_id: string | null;
+  creado_en: string;
+}
+
+// --- Instituciones y país (WP-22) -------------------------------------------
+export type Pais = {
+  codigo: string;
+  nombre: string;
+  creado_en: string;
+}
+
+export type Institucion = {
+  id: string;
+  nombre: string;
+  tipo: TipoInstitucion;
+  pais_codigo: string;
+  activa: boolean;
+  creado_en: string;
+}
+
+export type ProfesionalInstitucion = {
+  id: string;
+  profesional_id: string;
+  institucion_id: string;
+  activa: boolean;
   creado_en: string;
 }
 
@@ -353,6 +391,31 @@ export type ProgramaPatrocinadoInsert = {
   programa_id: string;
   etiqueta_cohorte?: string | null;
   activo?: boolean;
+  pais_codigo?: string | null;
+  institucion_id?: string | null;
+  creado_en?: string;
+}
+
+export type PaisInsert = {
+  codigo: string;
+  nombre: string;
+  creado_en?: string;
+}
+
+export type InstitucionInsert = {
+  id?: string;
+  nombre: string;
+  tipo?: TipoInstitucion;
+  pais_codigo: string;
+  activa?: boolean;
+  creado_en?: string;
+}
+
+export type ProfesionalInstitucionInsert = {
+  id?: string;
+  profesional_id: string;
+  institucion_id: string;
+  activa?: boolean;
   creado_en?: string;
 }
 
@@ -368,6 +431,7 @@ export type PacienteInsert = {
   racha_actual?: number;
   racha_maxima?: number;
   ultimo_checkin?: string | null;
+  institucion_id?: string | null;
   creado_en?: string;
 }
 
@@ -656,6 +720,24 @@ export type BaseDatos = {
         Row: ProgramaPatrocinado;
         Insert: ProgramaPatrocinadoInsert;
         Update: Partial<ProgramaPatrocinadoInsert>;
+        Relationships: [];
+      };
+      paises: {
+        Row: Pais;
+        Insert: PaisInsert;
+        Update: Partial<PaisInsert>;
+        Relationships: [];
+      };
+      instituciones: {
+        Row: Institucion;
+        Insert: InstitucionInsert;
+        Update: Partial<InstitucionInsert>;
+        Relationships: [];
+      };
+      profesionales_instituciones: {
+        Row: ProfesionalInstitucion;
+        Insert: ProfesionalInstitucionInsert;
+        Update: Partial<ProfesionalInstitucionInsert>;
         Relationships: [];
       };
     };

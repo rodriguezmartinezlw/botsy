@@ -41,6 +41,10 @@ export const esquemaEnrolamiento = z
       .optional()
       .or(z.literal("")),
     programaClave: z.string().trim().min(1, "Elige un programa.").max(80),
+    // Institución a la que se adscribe el paciente (WP-22). De las del profesional.
+    // La visibilidad del profesional pasa a ser por institución, así que es
+    // obligatoria: un paciente sin institución no lo ve ningún profesional.
+    institucionId: z.string().trim().uuid("Elige una institución."),
     // Cuando el email ya existe, el profesional confirma la vinculación.
     vincularExistente: z.boolean().optional().default(false),
   })
@@ -55,6 +59,7 @@ export type DatosEnrolamiento = {
   telefono: string | null;
   fechaNacimiento: string | null;
   programaClave: string;
+  institucionId: string;
   vincularExistente: boolean;
 };
 
@@ -66,6 +71,7 @@ function normalizar(e: EntradaEnrolamiento): DatosEnrolamiento {
     fechaNacimiento:
       e.fechaNacimiento && e.fechaNacimiento.length > 0 ? e.fechaNacimiento : null,
     programaClave: e.programaClave,
+    institucionId: e.institucionId,
     vincularExistente: e.vincularExistente ?? false,
   };
 }
@@ -90,11 +96,15 @@ export type PuertoEnrolamiento = {
   ): Promise<{ ok: true; userId: string } | { ok: false; error: string }>;
   /** Lee el estado del paciente existente (para decidir vinculación). */
   obtenerPaciente(userId: string): Promise<PacienteExistente | null>;
-  /** Asigna profesional (bootstrap) y datos no clínicos opcionales. */
+  /** Asigna profesional (médico responsable), institución (WP-22) y datos no clínicos. */
   vincularProfesional(
     userId: string,
     profesionalId: string,
-    extra: { telefono: string | null; fechaNacimiento: string | null },
+    extra: {
+      telefono: string | null;
+      fechaNacimiento: string | null;
+      institucionId: string;
+    },
   ): Promise<boolean>;
   /** Asigna el programa elegido y materializa sus reglas clave. */
   asignarPrograma(
@@ -163,6 +173,7 @@ export async function enrolarPaciente(
     const vinculado = await puerto.vincularProfesional(existente.id, sesionUserId, {
       telefono: d.telefono,
       fechaNacimiento: d.fechaNacimiento,
+      institucionId: d.institucionId,
     });
     if (!vinculado) return { ok: false, error: MSG_ERROR_GENERICO };
 
@@ -199,6 +210,7 @@ export async function enrolarPaciente(
   const vinculado = await puerto.vincularProfesional(invitacion.userId, sesionUserId, {
     telefono: d.telefono,
     fechaNacimiento: d.fechaNacimiento,
+    institucionId: d.institucionId,
   });
   if (!vinculado) return { ok: false, error: MSG_ERROR_GENERICO };
 

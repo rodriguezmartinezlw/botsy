@@ -23,7 +23,11 @@
 import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { crearClienteAdmin } from "@/lib/supabase/admin";
-import { obtenerSesionPanel, registrarAuditoria } from "@/lib/panel/sesion-panel";
+import {
+  obtenerSesionPanel,
+  registrarAuditoria,
+  type SesionPanel,
+} from "@/lib/panel/sesion-panel";
 import { asignarProgramaAPaciente } from "@/lib/programas/asignacion";
 import {
   enrolarPaciente as ejecutarEnrolamiento,
@@ -38,6 +42,31 @@ function baseAppUrl(): string {
   return (process.env.APP_URL ?? "").replace(/\/+$/, "");
 }
 
+/**
+ * Instituciones a las que la sesión puede adscribir un paciente (WP-22):
+ *  - profesional: SÓLO las suyas (membresías activas; la RLS ya filtra a las propias).
+ *  - admin: cualquiera activa.
+ * Nunca lanza; ante fallo devuelve lista vacía (la acción responde con error amable).
+ */
+async function idsInstitucionesPermitidas(sesion: SesionPanel): Promise<string[]> {
+  try {
+    if (sesion.rol === "admin") {
+      const { data } = await sesion.supabase
+        .from("instituciones")
+        .select("id")
+        .eq("activa", true);
+      return (data ?? []).map((i) => i.id);
+    }
+    const { data } = await sesion.supabase
+      .from("profesionales_instituciones")
+      .select("institucion_id")
+      .eq("activa", true);
+    return (data ?? []).map((m) => m.institucion_id);
+  } catch {
+    return [];
+  }
+}
+
 export async function enrolarPaciente(
   entrada: unknown,
 ): Promise<ResultadoEnrolamiento> {
@@ -50,6 +79,21 @@ export async function enrolarPaciente(
   const sesion = await obtenerSesionPanel();
   if (!sesion) {
     return { ok: false, error: "No tienes permiso para esta acción." };
+  }
+
+  // WP-22: la institución elegida define la VISIBILIDAD del paciente. Debe ser una
+  // de las del profesional (o cualquiera activa si es admin). Se valida en servidor.
+  const institucionId = analizado.data.institucionId;
+  const institucionesPermitidas = await idsInstitucionesPermitidas(sesion);
+  if (institucionesPermitidas.length === 0) {
+    return {
+      ok: false,
+      error:
+        "No tienes ninguna institución asignada. Pide al administrador que te asigne una antes de dar de alta pacientes.",
+    };
+  }
+  if (!institucionesPermitidas.includes(institucionId)) {
+    return { ok: false, error: "Elige una institución de las tuyas." };
   }
 
   let admin: SupabaseClient<BaseDatos>;
@@ -121,8 +165,9 @@ export async function enrolarPaciente(
     async vincularProfesional(userId, profesionalId, extra) {
       const actualizacionPaciente: {
         profesional_id: string;
+        institucion_id: string;
         fecha_nacimiento?: string;
-      } = { profesional_id: profesionalId };
+      } = { profesional_id: profesionalId, institucion_id: extra.institucionId };
       if (extra.fechaNacimiento) {
         actualizacionPaciente.fecha_nacimiento = extra.fechaNacimiento;
       }

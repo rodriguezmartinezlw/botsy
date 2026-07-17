@@ -3,7 +3,11 @@ import { Users } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import ListaPacientes from "@/components/panel/ListaPacientes";
 import FormularioNuevoPaciente from "@/components/panel/FormularioNuevoPaciente";
-import { listarPacientes, listarProgramasActivos } from "@/lib/panel/datos";
+import {
+  listarPacientes,
+  listarProgramasActivos,
+  listarInstitucionesDelProfesional,
+} from "@/lib/panel/datos";
 
 export const metadata: Metadata = {
   title: "Pacientes",
@@ -17,19 +21,20 @@ export const metadata: Metadata = {
  * más días sin check-in) al componente cliente, que sólo filtra por nombre.
  */
 export default async function PacientesPage() {
-  const [pacientes, programas] = await Promise.all([
+  const [pacientes, programas, instituciones] = await Promise.all([
     listarPacientes(),
     listarProgramasActivos(),
+    listarInstitucionesDelProfesional(),
   ]);
 
   return (
     <div className="flex flex-col gap-8">
       <EncabezadoPagina
         titulo="Pacientes"
-        descripcion="Tus pacientes asignados, ordenados por riesgo y tiempo sin check-in."
+        descripcion="Los pacientes de tu(s) institución(es), ordenados por riesgo y tiempo sin check-in."
         icono={<Users className="h-6 w-6" aria-hidden />}
       />
-      <FormularioNuevoPaciente programas={programas} />
+      <FormularioNuevoPaciente programas={programas} instituciones={instituciones} />
       <ListaPacientes pacientes={pacientes} />
     </div>
   );

@@ -4,18 +4,24 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus, X } from "lucide-react";
 import { enrolarPaciente } from "@/app/(panel)/pacientes/acciones";
-import type { PlantillaProgramaLista } from "@/lib/panel/datos";
+import type {
+  PlantillaProgramaLista,
+  InstitucionProfesional,
+} from "@/lib/panel/datos";
 
 /**
- * Alta de paciente desde el panel (WP-20 §A). Abre un formulario, llama a la
- * Server Action `enrolarPaciente` y muestra el resultado. Si el correo ya existe,
- * ofrece VINCULAR (reenvía la misma alta con `vincularExistente: true`) en vez de
- * duplicar. Al terminar con éxito, refresca la lista.
+ * Alta de paciente desde el panel (WP-20 §A + WP-22). Abre un formulario, llama a
+ * la Server Action `enrolarPaciente` y muestra el resultado. El paciente se
+ * adscribe a una INSTITUCIÓN (de las del profesional): eso define su visibilidad.
+ * Si el correo ya existe, ofrece VINCULAR (reenvía la misma alta con
+ * `vincularExistente: true`) en vez de duplicar. Al terminar con éxito, refresca.
  */
 export default function FormularioNuevoPaciente({
   programas,
+  instituciones,
 }: {
   programas: PlantillaProgramaLista[];
+  instituciones: InstitucionProfesional[];
 }) {
   const router = useRouter();
   const [abierto, setAbierto] = useState(false);
@@ -24,6 +30,7 @@ export default function FormularioNuevoPaciente({
   const [telefono, setTelefono] = useState("");
   const [fechaNacimiento, setFechaNacimiento] = useState("");
   const [programaClave, setProgramaClave] = useState(programas[0]?.clave ?? "");
+  const [institucionId, setInstitucionId] = useState(instituciones[0]?.id ?? "");
   const [mensaje, setMensaje] = useState<
     { ok: boolean; texto: string; emailExiste?: boolean } | null
   >(null);
@@ -35,6 +42,7 @@ export default function FormularioNuevoPaciente({
     setTelefono("");
     setFechaNacimiento("");
     setProgramaClave(programas[0]?.clave ?? "");
+    setInstitucionId(instituciones[0]?.id ?? "");
     setMensaje(null);
   }
 
@@ -47,6 +55,7 @@ export default function FormularioNuevoPaciente({
         telefono: telefono.trim(),
         fechaNacimiento: fechaNacimiento.trim(),
         programaClave,
+        institucionId,
         vincularExistente,
       });
       if (r.ok) {
@@ -63,6 +72,15 @@ export default function FormularioNuevoPaciente({
       <p className="rounded-[var(--radius-md)] bg-superficie-suave px-4 py-3 text-sm text-texto-suave">
         No hay programas disponibles para el alta. Configura un programa antes de
         enrolar pacientes.
+      </p>
+    );
+  }
+
+  if (instituciones.length === 0) {
+    return (
+      <p className="rounded-[var(--radius-md)] bg-superficie-suave px-4 py-3 text-sm text-texto-suave">
+        No tienes ninguna institución asignada. Pide al administrador que te
+        asigne una para poder dar de alta pacientes.
       </p>
     );
   }
@@ -84,7 +102,10 @@ export default function FormularioNuevoPaciente({
   }
 
   const puedeEnviar =
-    nombre.trim().length > 0 && email.trim().length > 0 && programaClave.length > 0;
+    nombre.trim().length > 0 &&
+    email.trim().length > 0 &&
+    programaClave.length > 0 &&
+    institucionId.length > 0;
 
   return (
     <section
@@ -161,6 +182,25 @@ export default function FormularioNuevoPaciente({
             />
           </label>
         </div>
+
+        <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
+          Institución
+          <select
+            value={institucionId}
+            onChange={(e) => setInstitucionId(e.target.value)}
+            className="rounded-[var(--radius-md)] border border-borde bg-superficie px-3 py-2.5 text-base text-texto focus:border-primario focus:outline-none"
+          >
+            {instituciones.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.nombre}
+                {i.paisNombre ? ` · ${i.paisNombre}` : ""}
+              </option>
+            ))}
+          </select>
+          <span className="text-xs font-normal text-texto-tenue">
+            El paciente será visible para los profesionales de esta institución.
+          </span>
+        </label>
 
         <label className="flex flex-col gap-1 text-sm font-medium text-texto-suave">
           Programa a asignar

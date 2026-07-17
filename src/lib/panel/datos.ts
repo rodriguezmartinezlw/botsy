@@ -131,6 +131,81 @@ export async function listarProgramasActivos(): Promise<PlantillaProgramaLista[]
 }
 
 // =====================================================================
+// Instituciones del profesional actual (WP-22): para el alta y el filtro.
+// =====================================================================
+
+export type InstitucionProfesional = {
+  id: string;
+  nombre: string;
+  paisNombre: string | null;
+};
+
+/**
+ * Instituciones del profesional actual (sus membresías activas). Para el admin
+ * devuelve todas las instituciones activas (puede adscribir a cualquiera). Nunca
+ * lanza: ante falta de sesión/datos devuelve lista vacía y la UI muestra el aviso
+ * de "pide una institución al administrador".
+ */
+export async function listarInstitucionesDelProfesional(): Promise<
+  InstitucionProfesional[]
+> {
+  try {
+    const supabase = await crearClienteServidor();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return [];
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("rol")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    type FilaInstitucion = { id: string; nombre: string; pais_codigo: string };
+    let instituciones: FilaInstitucion[] = [];
+    if (perfil?.rol === "admin") {
+      const { data } = await supabase
+        .from("instituciones")
+        .select("id, nombre, pais_codigo")
+        .eq("activa", true)
+        .order("nombre", { ascending: true });
+      instituciones = data ?? [];
+    } else {
+      // RLS: SÓLO las membresías propias del profesional.
+      const { data: membresias } = await supabase
+        .from("profesionales_instituciones")
+        .select("institucion_id")
+        .eq("activa", true);
+      const ids = (membresias ?? []).map((m) => m.institucion_id);
+      if (ids.length === 0) return [];
+      const { data } = await supabase
+        .from("instituciones")
+        .select("id, nombre, pais_codigo")
+        .in("id", ids)
+        .eq("activa", true)
+        .order("nombre", { ascending: true });
+      instituciones = data ?? [];
+    }
+    if (instituciones.length === 0) return [];
+
+    const paisCodigos = [...new Set(instituciones.map((i) => i.pais_codigo))];
+    const { data: paises } = await supabase
+      .from("paises")
+      .select("codigo, nombre")
+      .in("codigo", paisCodigos);
+    const nombrePais = new Map((paises ?? []).map((p) => [p.codigo, p.nombre]));
+
+    return instituciones.map((i) => ({
+      id: i.id,
+      nombre: i.nombre,
+      paisNombre: nombrePais.get(i.pais_codigo) ?? null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// =====================================================================
 // Lista de pacientes (RF-DB, versión F1).
 // =====================================================================
 
@@ -145,19 +220,27 @@ export async function listarPacientes(): Promise<PacienteLista[]> {
     const hoy = fechaHoyEnZona(ZONA_POR_DEFECTO);
     const desde7 = format(subDays(parseISO(hoy), 6), "yyyy-MM-dd");
 
-    // RLS: sólo pacientes asignados a este profesional.
+    // RLS: sólo pacientes de las instituciones de este profesional (WP-22).
     const { data: pacientes } = await supabase
       .from("pacientes")
-      .select("id, fecha_nacimiento, vertical, ultimo_checkin");
+      .select("id, fecha_nacimiento, vertical, ultimo_checkin, institucion_id");
     if (!pacientes || pacientes.length === 0) return [];
 
     const ids = pacientes.map((p) => p.id);
+    const institucionIds = [
+      ...new Set(
+        pacientes
+          .map((p) => p.institucion_id)
+          .filter((x): x is string => x !== null),
+      ),
+    ];
 
     const [
       { data: perfiles },
       { data: checkins },
       { data: tomas },
       { data: alertas },
+      { data: instituciones },
     ] = await Promise.all([
       supabase.from("perfiles").select("id, nombre, avatar_url").in("id", ids),
       supabase.from("checkins").select("paciente_id, fecha").in("paciente_id", ids),
@@ -171,10 +254,19 @@ export async function listarPacientes(): Promise<PacienteLista[]> {
         .select("paciente_id, nivel, estado")
         .in("paciente_id", ids)
         .in("estado", ["nueva", "vista"]),
+      institucionIds.length
+        ? supabase
+            .from("instituciones")
+            .select("id, nombre")
+            .in("id", institucionIds)
+        : Promise.resolve({ data: [] as { id: string; nombre: string }[] }),
     ]);
 
     const perfilPorId = new Map(
       (perfiles ?? []).map((p) => [p.id, p]),
+    );
+    const nombreInstitucionPorId = new Map(
+      (instituciones ?? []).map((i) => [i.id, i.nombre]),
     );
     const ultimoCheckinPorPaciente = new Map<string, string | null>();
     for (const c of checkins ?? []) {
@@ -206,6 +298,10 @@ export async function listarPacientes(): Promise<PacienteLista[]> {
         ultimoCheckin,
         diasSinCheckin: diasSinCheckin(ultimoCheckin, hoy),
         semaforo: nivelSemaforo(alertasPaciente),
+        institucionId: p.institucion_id,
+        institucionNombre: p.institucion_id
+          ? nombreInstitucionPorId.get(p.institucion_id) ?? null
+          : null,
       };
     });
 
@@ -329,7 +425,7 @@ export async function cargarFichaPaciente(
     const { data: paciente } = await supabase
       .from("pacientes")
       .select(
-        "id, fecha_nacimiento, sexo, vertical, condiciones, racha_actual, racha_maxima, ultimo_checkin",
+        "id, fecha_nacimiento, sexo, vertical, condiciones, racha_actual, racha_maxima, ultimo_checkin, institucion_id",
       )
       .eq("id", pacienteId)
       .maybeSingle();
@@ -340,6 +436,27 @@ export async function cargarFichaPaciente(
       .select("nombre, avatar_url, telefono, zona_horaria")
       .eq("id", pacienteId)
       .maybeSingle();
+
+    // Institución + país del paciente (WP-22). RLS: el catálogo es legible por el
+    // profesional; el paciente ya es visible, así que su institución también.
+    let institucionNombre: string | null = null;
+    let paisNombre: string | null = null;
+    if (paciente.institucion_id) {
+      const { data: institucion } = await supabase
+        .from("instituciones")
+        .select("nombre, pais_codigo")
+        .eq("id", paciente.institucion_id)
+        .maybeSingle();
+      institucionNombre = institucion?.nombre ?? null;
+      if (institucion?.pais_codigo) {
+        const { data: pais } = await supabase
+          .from("paises")
+          .select("nombre")
+          .eq("codigo", institucion.pais_codigo)
+          .maybeSingle();
+        paisNombre = pais?.nombre ?? null;
+      }
+    }
 
     const nombre = perfil?.nombre ?? "Paciente";
     const zona = perfil?.zona_horaria ?? ZONA_POR_DEFECTO;
@@ -554,6 +671,8 @@ export async function cargarFichaPaciente(
         telefono: perfil?.telefono ?? null,
         rachaActual: paciente.racha_actual ?? 0,
         rachaMaxima: paciente.racha_maxima ?? 0,
+        institucionNombre,
+        paisNombre,
       },
       timeline,
       tendencias,

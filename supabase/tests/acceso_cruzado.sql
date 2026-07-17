@@ -11,10 +11,17 @@
 --
 -- Nota: tras el seed oncológico de WP-17, …0003 = María y …0004 = Carmen (ambas
 -- pacientes de la Dra. García, cáncer de mama). Los escenarios 1-6 siguen siendo
--- válidos (son por ID). Se añaden los escenarios 7-8 (patrocinador, WP-17).
+-- válidos (son por ID). Se añaden los escenarios 7-8 (patrocinador, WP-17) y los
+-- 9-11 (instituciones, WP-22).
+--
+-- WP-22 (visibilidad POR INSTITUCIÓN): García y sus pacientes -> Institución A;
+-- Ruiz y Marta -> Institución B; Dr. Vega (…0007) -> A y B (multi-institución).
+-- Los escenarios 4/5 (García no ve a Marta; Ruiz no ve a los de García) siguen
+-- pasando porque el seed coloca a cada profesional y a sus pacientes en la misma
+-- institución. Los escenarios 9-11 verifican el nuevo modelo explícitamente.
 --
 -- CÓMO EJECUTAR (requiere un entorno Supabase con las migraciones + ambos seeds):
---   supabase db reset                       # aplica 0001..0010 + supabase/seed.sql
+--   supabase db reset                       # aplica 0001..0017 + supabase/seed.sql
 --   psql "$DATABASE_URL" -f supabase/seed_wp06_segundo_profesional.sql
 --   psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f supabase/tests/acceso_cruzado.sql
 --
@@ -242,6 +249,100 @@ begin
 
   reset role;
   raise notice 'OK: las RPC de agregados omiten cortes < 5 (k-anonimato)';
+end $$;
+
+-- --- Escenario 9: Dr. Vega (A+B) ve a los pacientes de AMBAS instituciones -----
+-- Multi-institución (WP-22): un profesional que trabaja en varias instituciones
+-- ve a los pacientes de todas ellas (herencia del helper es_profesional_de
+-- reescrito). Vega ve a María/Carmen (Institución A) Y a Marta (Institución B).
+do $$
+declare
+  v_vega   uuid := '00000000-0000-4000-8000-000000000007';
+  v_maria  uuid := '00000000-0000-4000-8000-000000000003';
+  v_carmen uuid := '00000000-0000-4000-8000-000000000004';
+  v_marta  uuid := '00000000-0000-4000-8000-000000000006';
+  n int;
+begin
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_vega), true);
+  set local role authenticated;
+
+  select count(*) into n from public.pacientes where id = v_maria;
+  assert n = 1, 'FALLO: Vega (A+B) no ve a María (Institución A)';
+  select count(*) into n from public.pacientes where id = v_carmen;
+  assert n = 1, 'FALLO: Vega (A+B) no ve a Carmen (Institución A)';
+  select count(*) into n from public.pacientes where id = v_marta;
+  assert n = 1, 'FALLO: Vega (A+B) no ve a Marta (Institución B)';
+  -- Y ve datos clínicos de ambas instituciones.
+  select count(*) into n from public.observaciones where paciente_id = v_maria;
+  assert n >= 1, 'FALLO: Vega no ve observaciones de María (Institución A)';
+  select count(*) into n from public.alertas where paciente_id = v_marta;
+  assert n >= 1, 'FALLO: Vega no ve la alerta de Marta (Institución B)';
+
+  reset role;
+  raise notice 'OK: un profesional MULTI-INSTITUCIÓN ve a los pacientes de todas sus instituciones';
+end $$;
+
+-- --- Escenario 10: catálogo y membresías (WP-22) -----------------------------
+-- El catálogo país/instituciones es legible por cualquier profesional; las
+-- membresías (profesionales_instituciones) SÓLO las propias de cada profesional.
+do $$
+declare
+  v_garcia uuid := '00000000-0000-4000-8000-000000000002';
+  v_ruiz   uuid := '00000000-0000-4000-8000-000000000005';
+  v_vega   uuid := '00000000-0000-4000-8000-000000000007';
+  n int;
+begin
+  -- García (Institución A): lee el catálogo y SÓLO su membresía.
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_garcia), true);
+  set local role authenticated;
+  select count(*) into n from public.paises;
+  assert n >= 1, 'FALLO: un profesional no lee el catálogo de países';
+  select count(*) into n from public.instituciones;
+  assert n >= 2, 'FALLO: un profesional no lee el catálogo de instituciones';
+  select count(*) into n from public.profesionales_instituciones;
+  assert n = 1, 'FALLO: García ve membresías que no son suyas (esperado 1: A)';
+  reset role;
+
+  -- Ruiz (Institución B): SÓLO su membresía.
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_ruiz), true);
+  set local role authenticated;
+  select count(*) into n from public.profesionales_instituciones;
+  assert n = 1, 'FALLO: Ruiz ve membresías que no son suyas (esperado 1: B)';
+  reset role;
+
+  -- Vega: sus DOS membresías (A y B).
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_vega), true);
+  set local role authenticated;
+  select count(*) into n from public.profesionales_instituciones;
+  assert n = 2, 'FALLO: Vega no ve sus 2 membresías (A+B)';
+  reset role;
+
+  raise notice 'OK: catálogo legible por profesional; cada profesional ve SÓLO sus membresías';
+end $$;
+
+-- --- Escenario 11: un paciente NO lee el catálogo ni las membresías ----------
+do $$
+declare
+  v_maria uuid := '00000000-0000-4000-8000-000000000003';
+  n int;
+begin
+  perform set_config('request.jwt.claims',
+    format('{"sub":"%s","role":"authenticated"}', v_maria), true);
+  set local role authenticated;
+
+  select count(*) into n from public.paises;
+  assert n = 0, 'FALLO: un paciente lee el catálogo de países';
+  select count(*) into n from public.instituciones;
+  assert n = 0, 'FALLO: un paciente lee el catálogo de instituciones';
+  select count(*) into n from public.profesionales_instituciones;
+  assert n = 0, 'FALLO: un paciente lee membresías de profesionales';
+
+  reset role;
+  raise notice 'OK: un paciente NO lee catálogo de instituciones/países ni membresías';
 end $$;
 
 do $$

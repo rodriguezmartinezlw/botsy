@@ -14,9 +14,10 @@
 --   dr.ruiz@botsy.local   (profesional — Dr. Ruiz)
 --   marta@botsy.local     (paciente  — Marta, 59, salud mental; de Dr. Ruiz)
 --
--- Comprobación esperada (con RLS activa, cada uno logueado como sí mismo):
---   - Dra. García: `select id from pacientes` → SÓLO Luis y Carmen (no Marta).
---   - Dr. Ruiz:    `select id from pacientes` → SÓLO Marta (no Luis ni Carmen).
+-- Comprobación esperada (con RLS activa, cada uno logueado como sí mismo).
+-- Desde WP-22 la visibilidad es POR INSTITUCIÓN (no por profesional_id):
+--   - Dra. García (Institución A): ve a los pacientes de A; NO ve a Marta (B).
+--   - Dr. Ruiz (Institución B):    ve SÓLO a Marta; NO ve a los pacientes de A.
 --   - Dr. Ruiz:    `select * from alertas`    → SÓLO la alerta de Marta.
 -- =====================================================================
 
@@ -67,13 +68,24 @@ update public.pacientes set
   sexo             = 'femenino',
   vertical         = 'mental',
   condiciones      = array['Trastorno de ansiedad'],
-  profesional_id   = '00000000-0000-4000-8000-000000000005',
+  profesional_id   = '00000000-0000-4000-8000-000000000005',                 -- médico responsable
+  institucion_id   = '00000000-0000-4000-8000-000000000b02',                 -- WP-22: Marta -> Institución B
   telefono_medico  = '+34600333444',
   hora_checkin     = '10:00',
   racha_actual     = 5,
   racha_maxima     = 9,
   ultimo_checkin   = current_date
   where id = '00000000-0000-4000-8000-000000000006'; -- Marta
+
+-- ---------------------------------------------------------------------
+-- 3b) Membresía del Dr. Ruiz en la Institución B (WP-22). La institución B se
+--     crea en supabase/seed.sql (sección 2b), que corre antes que este archivo.
+--     Con la RLS por institución (es_profesional_de reescrita), esta membresía es
+--     lo que da a Ruiz acceso a Marta (y a ningún paciente de la Institución A).
+-- ---------------------------------------------------------------------
+insert into public.profesionales_instituciones (profesional_id, institucion_id, activa) values
+  ('00000000-0000-4000-8000-000000000005', '00000000-0000-4000-8000-000000000b02', true) -- Ruiz -> B
+on conflict (profesional_id, institucion_id) do nothing;
 
 -- ---------------------------------------------------------------------
 -- 4) Pauta de Marta (no crítica).

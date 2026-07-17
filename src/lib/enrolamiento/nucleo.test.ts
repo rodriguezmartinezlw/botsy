@@ -23,7 +23,7 @@ const PROFESIONAL = "prof-1";
 
 type Registro = {
   invitados: string[];
-  vinculados: { userId: string; profesionalId: string }[];
+  vinculados: { userId: string; profesionalId: string; institucionId: string }[];
   programas: { userId: string; clave: string }[];
   auditorias: { accion: string; entidadId: string }[];
 };
@@ -54,8 +54,8 @@ function crearPuerto(opts: {
     async obtenerPaciente() {
       return opts.paciente ?? null;
     },
-    async vincularProfesional(userId, profesionalId) {
-      reg.vinculados.push({ userId, profesionalId });
+    async vincularProfesional(userId, profesionalId, extra) {
+      reg.vinculados.push({ userId, profesionalId, institucionId: extra.institucionId });
       return opts.vincularOk !== false;
     },
     async asignarPrograma(userId, clave) {
@@ -71,12 +71,15 @@ function crearPuerto(opts: {
   return { puerto, reg };
 }
 
+const INSTITUCION_A = "00000000-0000-4000-8000-000000000b01";
+
 const ENTRADA_BASE = {
   nombre: "María Pérez",
   email: "maria@ejemplo.com",
   telefono: "+51 900 111 222",
   fechaNacimiento: "1962-03-04",
   programaClave: "mama_terapia_oral",
+  institucionId: INSTITUCION_A,
 };
 
 function validar(entrada: Record<string, unknown>) {
@@ -95,7 +98,7 @@ describe("enrolarPaciente — alta nueva por invitación", () => {
     expect(r.estado).toBe("invitado");
     expect(reg.invitados).toEqual(["maria@ejemplo.com"]);
     expect(reg.vinculados).toEqual([
-      { userId: "nuevo-user", profesionalId: PROFESIONAL },
+      { userId: "nuevo-user", profesionalId: PROFESIONAL, institucionId: INSTITUCION_A },
     ]);
     expect(reg.programas).toEqual([
       { userId: "nuevo-user", clave: "mama_terapia_oral" },
@@ -144,7 +147,9 @@ describe("enrolarPaciente — email ya existente: se ofrece vincular, no se dupl
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.estado).toBe("vinculado");
-    expect(reg.vinculados).toEqual([{ userId: "u-2", profesionalId: PROFESIONAL }]);
+    expect(reg.vinculados).toEqual([
+      { userId: "u-2", profesionalId: PROFESIONAL, institucionId: INSTITUCION_A },
+    ]);
     expect(reg.programas).toEqual([{ userId: "u-2", clave: "mama_terapia_oral" }]);
     expect(reg.auditorias[0]?.accion).toBe("paciente_vinculado");
   });
@@ -212,6 +217,23 @@ describe("esquemaEnrolamiento — validación de la entrada", () => {
     expect(esquemaEnrolamiento.safeParse(sinPrograma).success).toBe(false);
   });
 
+  it("exige una institución (uuid válido) — WP-22", () => {
+    expect(esquemaEnrolamiento.safeParse({ ...ENTRADA_BASE, institucionId: "" }).success).toBe(
+      false,
+    );
+    expect(
+      esquemaEnrolamiento.safeParse({ ...ENTRADA_BASE, institucionId: "no-es-uuid" }).success,
+    ).toBe(false);
+    const sinInstitucion = {
+      nombre: ENTRADA_BASE.nombre,
+      email: ENTRADA_BASE.email,
+      telefono: ENTRADA_BASE.telefono,
+      fechaNacimiento: ENTRADA_BASE.fechaNacimiento,
+      programaClave: ENTRADA_BASE.programaClave,
+    };
+    expect(esquemaEnrolamiento.safeParse(sinInstitucion).success).toBe(false);
+  });
+
   it("rechaza campos extra (esquema estricto: no cuela nada clínico)", () => {
     const conExtra = { ...ENTRADA_BASE, vertical: "mental" };
     expect(esquemaEnrolamiento.safeParse(conExtra).success).toBe(false);
@@ -226,7 +248,20 @@ describe("RLS — el paciente recién enrolado ve lo suyo y el profesional lo ve
   it("existen las políticas de visibilidad de pacientes (propio + profesional)", () => {
     expect(RLS).toMatch(/pacientes_select_propio/);
     expect(RLS).toMatch(/pacientes_select_profesional/);
-    // El profesional ve al paciente cuando profesional_id = auth.uid() (es_profesional_de).
+    // La visibilidad del profesional se decide en el helper es_profesional_de.
     expect(RLS).toMatch(/es_profesional_de/);
+  });
+
+  it("WP-22: es_profesional_de se reescribe a visibilidad POR INSTITUCIÓN (0016)", () => {
+    const MIG = readFileSync(
+      join(process.cwd(), "supabase", "migrations", "0016_instituciones_pais.sql"),
+      "utf8",
+    );
+    // Reescritura del MISMO helper (nombre/firma) para heredar el modelo en todas las políticas.
+    expect(MIG).toMatch(/create or replace function public\.es_profesional_de\(p_paciente uuid\)/);
+    // El cuerpo decide por membresía activa en profesionales_instituciones + institución del paciente.
+    expect(MIG).toMatch(/profesionales_instituciones/);
+    expect(MIG).toMatch(/pac\.institucion_id = pi\.institucion_id/);
+    expect(MIG).toMatch(/pi\.activa/);
   });
 });

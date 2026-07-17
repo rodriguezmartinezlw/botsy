@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, FileText, Flame, Phone } from "lucide-react";
+import { ArrowLeft, Building2, FileText, Flame, Phone } from "lucide-react";
 import type { CabeceraFicha as CabeceraFichaTipo } from "@/lib/panel/tipos";
 import type { VerticalPaciente } from "@/types/db";
 
@@ -51,6 +51,13 @@ export default function CabeceraFicha({
               {cabecera.nombre}
             </h1>
             <p className="text-base text-texto-suave">{datos.join(" · ")}</p>
+            {cabecera.institucionNombre ? (
+              <p className="inline-flex items-center gap-1.5 text-sm text-texto-suave">
+                <Building2 className="h-4 w-4 text-texto-tenue" aria-hidden />
+                {cabecera.institucionNombre}
+                {cabecera.paisNombre ? ` · ${cabecera.paisNombre}` : ""}
+              </p>
+            ) : null}
             {cabecera.condiciones.length > 0 ? (
               <ul className="flex flex-wrap gap-2" role="list">
                 {cabecera.condiciones.map((c) => (

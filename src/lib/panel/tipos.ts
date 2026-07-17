@@ -35,6 +35,10 @@ export type CabeceraFicha = {
   telefono: string | null;
   rachaActual: number;
   rachaMaxima: number;
+  /** Institución del paciente (WP-22); `null` si no consta. */
+  institucionNombre: string | null;
+  /** País de la institución del paciente (WP-22); `null` si no consta. */
+  paisNombre: string | null;
 };
 
 // --- Línea temporal unificada ------------------------------------------------
