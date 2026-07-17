@@ -61,7 +61,7 @@ export type CondCombinacion = {
 /**
  * Condición sobre un INSTRUMENTO administrado (WP-16). Casa cuando existe una
  * respuesta del instrumento indicado en el check-in con puntuación dentro del
- * rango. El umbral (`puntuacion_gte`) es CONFIGURABLE y [PENDIENTE CLÍNICO]: vive
+ * rango. El umbral (`puntuacion_gte`) es CONFIGURABLE (estándar NCCN ≥4): vive
  * en la regla de programa, no en el motor.
  */
 export type CondInstrumento = {

@@ -12,7 +12,7 @@
  *    seguro (plantilla del catálogo + override por paciente). Puro y testeado.
  *
  * Todos los umbrales clínicos concretos viven en el SEED de cada programa
- * (`escalado.reglas_clave`) y van marcados `[PENDIENTE CLÍNICO]`; este módulo
+ * (`escalado.reglas_clave`) con valores ESTÁNDAR de guías (NCCN/IDSA/EVA), configurables; este módulo
  * solo define la estructura, no los números.
  */
 

@@ -10,7 +10,7 @@
  * escalado por puntuación lo decide el motor determinista (regla de programa),
  * no este módulo.
  *
- * TODO lo clínico va marcado [PENDIENTE CLÍNICO] hasta la validación del
+ * Los valores clínicos son los ESTÁNDAR publicados (guía NCCN del Termómetro de Distrés); son configurables y su revisión por el
  * psicooncólogo (llamada 1): la VERSIÓN del instrumento, la traducción es-ES de
  * los problemas y el UMBRAL de referencia. El umbral efectivo del escalado vive
  * en la config del programa (`escalado.reglas_clave`, condición `instrumento`),
@@ -25,7 +25,7 @@ import {
 } from "date-fns";
 import type { Rango, SeriePunto } from "@/lib/agregados";
 
-// --- Identidad y versión del instrumento (CONFIGURABLE, [PENDIENTE CLÍNICO]) --
+// --- Identidad y versión del instrumento (ESTÁNDAR NCCN; configurable) -------
 
 /** Claves de instrumento soportadas (ampliable; espejo del check del SQL). */
 export const INSTRUMENTOS = ["termometro_distres_nccn"] as const;
@@ -38,11 +38,11 @@ export type OrigenInstrumento = (typeof ORIGENES_INSTRUMENTO)[number];
 /**
  * Versión del instrumento, TRAZADA en cada respuesta (integridad del dato para
  * RWE). CONFIGURABLE por env `TERMOMETRO_DISTRES_VERSION`; el valor por defecto
- * queda marcado [PENDIENTE CLÍNICO] hasta que el psicooncólogo valide la versión
+ * usa la versión genérica es-ES del instrumento NCCN; el psicooncólogo puede validar/ajustar la versión
  * es-ES del termómetro y su lista de problemas.
  */
 export const VERSION_TERMOMETRO_DISTRES_DEFECTO =
-  "nccn-dt-es-v0-PENDIENTE_CLINICO";
+  "nccn-dt-es-v1-generica";
 
 /** Versión por defecto por instrumento (extensible cuando haya más de uno). */
 const VERSION_POR_INSTRUMENTO: Record<ClaveInstrumento, string> = {
@@ -64,7 +64,7 @@ export const DISTRES_MIN = 0;
 export const DISTRES_MAX = 10;
 
 /**
- * Umbral NCCN estándar de REFERENCIA (≥4 deriva a evaluación). [PENDIENTE
+ * Umbral NCCN ESTÁNDAR (≥4 deriva a evaluación; guía NCCN Distress Management). [Configurable
  * CLÍNICO]. El umbral EFECTIVO del escalado es configurable y vive en la regla
  * de programa (`condicion.puntuacion_gte`); esta constante solo documenta el
  * estándar y sirve de referencia al guion (a partir de aquí se recorren los
@@ -72,7 +72,7 @@ export const DISTRES_MAX = 10;
  */
 export const UMBRAL_DISTRES_REFERENCIA = 4;
 
-// --- Catálogo de problemas NCCN (es-ES, [PENDIENTE CLÍNICO]) ------------------
+// --- Catálogo de problemas NCCN (es-ES, versión genérica estándar) -----------
 
 export const CATEGORIAS_PROBLEMA = [
   "practicos",

@@ -60,8 +60,8 @@ export default async function ConsentimientosPage() {
       <PanelConsentimientos estadoInicial={estado} historial={historial} />
 
       <p className="text-sm text-texto-tenue">
-        Los textos legales definitivos están pendientes de revisión jurídica. La
-        versión actual es un borrador de trabajo marcado como [PENDIENTE LEGAL].
+        Estos textos son la versión genérica vigente, redactada conforme al RGPD.
+        Si se actualizan, verás siempre la versión en vigor y la fecha de tu firma.
       </p>
     </div>
   );

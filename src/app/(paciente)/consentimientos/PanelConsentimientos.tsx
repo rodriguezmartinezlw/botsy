@@ -144,7 +144,7 @@ export default function PanelConsentimientos({
                 {guardando ? " · guardando…" : ""}
               </span>
               <span className="text-sm text-texto-tenue">
-                [PENDIENTE LEGAL] · {VERSION_TEXTO}
+                Versión del texto: {VERSION_TEXTO}
               </span>
             </div>
 

@@ -4,7 +4,7 @@
  */
 
 /** Versión del texto legal vigente (placeholder F1). */
-export const VERSION_TEXTO_CONSENTIMIENTO = "v0-borrador";
+export const VERSION_TEXTO_CONSENTIMIENTO = "v1-generica-2026-07";
 
 export type ResultadoConsentimiento =
   | { ok: true }

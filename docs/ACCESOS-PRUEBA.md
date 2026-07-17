@@ -53,7 +53,7 @@ npm run dev
 
 - **Emails de recordatorio diario y aviso de urgencia al profesional**: falta `RESEND_API_KEY`. (Invitación y recuperación SÍ funcionan, van por Supabase.)
 - Los emails `@botsy.local` no reciben correo (usa tu email real para probar invitación/recuperación).
-- Los umbrales clínicos son borrador `[PENDIENTE CLÍNICO]` y los textos legales `[PENDIENTE LEGAL]`.
+- Los umbrales clínicos usan los valores ESTÁNDAR de guías (NCCN/IDSA/CTCAE) y los textos legales la versión genérica v1 — ambos configurables; revisión experta recomendable antes de pacientes reales.
 - La app corre solo en local (sin deploy a Vercel todavía).
 
 ## Si algo falla

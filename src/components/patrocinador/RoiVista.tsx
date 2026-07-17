@@ -151,7 +151,7 @@ export default function RoiVista({
             urgencias realmente evitadas</em>: es un proxy conservador de episodios
             gestionados por el equipo clínico sin que escalaran a urgencias u
             hospitalización. Se reporta como proxy, no como resultado clínico.
-            [PENDIENTE CLÍNICO] validación de la definición con el pagador.
+            La definición del proxy es ajustable con cada pagador.
           </li>
           <li>
             <span className="font-semibold text-texto">Tiempo hasta escalado:</span>{" "}
@@ -177,7 +177,7 @@ export default function RoiVista({
           capturados.
         </p>
         <p>
-          [PENDIENTE LEGAL] Datos agregados y pseudonimizados con k-anonimato ≥ 5.
+          Datos agregados y pseudonimizados con k-anonimato ≥ 5.
           Documento de apoyo a la evaluación del pagador; no constituye diagnóstico
           ni predicción.
         </p>

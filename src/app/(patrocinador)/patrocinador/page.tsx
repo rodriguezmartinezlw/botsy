@@ -60,7 +60,7 @@ export default async function DashboardPatrocinadorPage() {
           diagnóstico, predicción ni triaje autónomo.
         </p>
         <p>
-          [PENDIENTE LEGAL] Datos pseudonimizados con k-anonimato ≥ 5. El
+          Datos pseudonimizados con k-anonimato ≥ 5. El
           patrocinador no accede en ningún caso a datos identificables de
           pacientes; el escalado lo realiza el equipo clínico mediante reglas que
           configura.

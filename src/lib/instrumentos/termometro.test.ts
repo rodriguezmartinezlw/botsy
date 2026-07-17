@@ -3,7 +3,7 @@
  *
  * Cubre: la decisión de FRECUENCIA (cuándo toca preguntar), la SERIE temporal
  * del panel y los PROBLEMAS más frecuentes, más la versión trazada. Umbral y
- * versión [PENDIENTE CLÍNICO].
+ * versión genérica estándar (v1).
  */
 
 import { describe, expect, it } from "vitest";
@@ -106,8 +106,8 @@ describe("problemasFrecuentes — recuento y etiquetas", () => {
 // --- Versión trazada + referencias -------------------------------------------
 
 describe("identidad del instrumento", () => {
-  it("la versión por defecto está marcada [PENDIENTE CLÍNICO] y es la trazada sin env", () => {
-    expect(VERSION_TERMOMETRO_DISTRES_DEFECTO).toContain("PENDIENTE_CLINICO");
+  it("la versión por defecto es la genérica estándar y es la trazada sin env", () => {
+    expect(VERSION_TERMOMETRO_DISTRES_DEFECTO).toContain("v1-generica");
     expect(versionInstrumento("termometro_distres_nccn")).toBe(
       process.env.TERMOMETRO_DISTRES_VERSION?.trim() ||
         VERSION_TERMOMETRO_DISTRES_DEFECTO,

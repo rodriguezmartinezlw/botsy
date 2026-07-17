@@ -19,7 +19,7 @@
 | WP-10 | Deuda técnica (7 ítems: aviso urgencia por email, proxy ?next=, validador cifras en letras…) | ✅ |
 | WP-11 v2 | Programas de mama («Terapia oral», «Tratamiento activo») + **disposición estructurada obligatoria** + CTCAE + `uso_secundario` | ✅ |
 | WP-17 + WP-15 | **Dashboard del patrocinador** (solo agregados k≥5, RPC security definer) + modo demo + **informe ROI** + seed oncológico | ✅ |
-| WP-16 | Termómetro de Distrés NCCN conversacional (umbral `[PENDIENTE CLÍNICO]`) | ✅ |
+| WP-16 | Termómetro de Distrés NCCN conversacional (umbral estándar NCCN ≥4, configurable) | ✅ |
 | WP-09 | Migraciones **0001–0013** + seed aplicados al Supabase real (`hjkvmhccgorphhykoarg`); `acceso_cruzado.sql` EN VERDE en vivo (destapó y se corrigieron 2 bugs reales: RLS de reglas_escalado → 0012; RPC `n` ambiguo → 0013); E2E de IA con clave real OK | ✅ |
 
 **Métricas:** 216 tests en verde · 19 tablas con RLS verificada en vivo · las 3 caras funcionan (paciente / profesional / patrocinador) · demo vendible: `DEMO_MODE=true npm run dev` + `docs/DEMO-GUION.md`. Claves en `.env.local` (Supabase completo + OpenAI texto y Realtime). Revisiones del director en `docs/revisiones/WP-*.md`.
@@ -42,9 +42,9 @@
 
 ## Insumos que solo puede aportar el fundador
 
-1. **Las tres llamadas** (MEMORIA §14, antes del 1-ago-2026): psicooncólogo → fija los umbrales `[PENDIENTE CLÍNICO]` (reglas oncológicas, termómetro, frecuencias); asociación → desbloquea WP-19 y las 5 pacientes de la demo; Pfizer/Roche → ruta A y desbloquea WP-18.
+1. **Las tres llamadas** (MEMORIA §14, antes del 1-ago-2026): psicooncólogo → VALIDA los umbrales (ya aplicados con valores estándar de guías NCCN/IDSA/CTCAE — recomendable, no bloqueante); asociación → desbloquea WP-19 y las 5 pacientes de la demo; Pfizer/Roche → ruta A y desbloquea WP-18.
 2. **`RESEND_API_KEY`** — único hueco de `.env.local`; solo afecta al envío real de emails (recordatorios, aviso de urgencia al profesional). La recuperación de contraseña y la invitación de pacientes (WP-20) usan el mailer integrado de Supabase, NO necesitan Resend.
-3. **Textos legales** (`[PENDIENTE LEGAL]`) y diligencia RGPD/DPA; *intended purpose* con consultor regulatorio antes de material comercial.
+3. **Textos legales**: aplicada la versión genérica v1 RGPD (consentimientos + avisos) por decisión del fundador (2026-07-17); revisión por asesoría y diligencia RGPD/DPA + *intended purpose* con consultor siguen siendo recomendables antes de material comercial.
 4. Cuenta Vercel para el deploy público (opcional hasta el piloto).
 
 ## Notas operativas

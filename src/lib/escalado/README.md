@@ -12,7 +12,7 @@ diagnóstico** (reglas clínicas de `CLAUDE.md`).
 | `motor.ts` | `evaluarReglas(datos, reglas)` PURO + `evaluarCheckin(checkinId)` (carga datos/contexto y evalúa). Validación Zod del JSONB de `condicion`. |
 | `senales.ts` | `evaluarSenal(entrada)` — clasificación EN VIVO de una señal durante la conversación (la consume `src/lib/ia/loop.ts`). `nivelMaximoRiesgo` (el riesgo solo sube). |
 | `acciones.ts` | `aplicarEscalado(evaluacion, repo)` — crea alertas + auditoría (RF-ES-06) y sube el riesgo, IDEMPOTENTE. Puerto `RepositorioAcciones` (testeable) + implementación con service-role. |
-| `textos.ts` | Textos al paciente centralizados (contactar / urgencia / vigilancia), con marca `[PENDIENTE LEGAL]`. Tono empático, sin diagnóstico ni alarmismo. |
+| `textos.ts` | Textos al paciente centralizados (contactar / urgencia / vigilancia), redacción genérica v1 (2026-07). Tono empático, sin diagnóstico ni alarmismo. |
 | `consultas.ts` | `obtenerAlertas(filtros)` con RLS de profesional (helper para WP-06). |
 
 ## Niveles y acciones

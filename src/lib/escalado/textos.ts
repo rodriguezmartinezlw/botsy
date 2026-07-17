@@ -9,8 +9,9 @@
  *  - Tono empático y NO alarmista; las urgencias dan instrucciones claras sin
  *    dramatizar.
  *  - Siempre se distingue "señal detectada" de "diagnóstico".
- *  - Los avisos con implicación legal van marcados [PENDIENTE LEGAL] hasta que
- *    los redacte la asesoría jurídica (PLAN-MAESTRO §6).
+ *  - Los avisos legales usan la redacción genérica v1 (2026-07); la revisión
+ *    por asesoría jurídica antes de pacientes reales es recomendable, no
+ *    bloqueante (decisión del fundador, 2026-07-17).
  *
  * Ubicación: al ser textos revisables por clínica/legal, viven juntos y no se
  * incrustan en los componentes.
@@ -18,8 +19,6 @@
 
 import type { NivelRiesgo } from "@/types/db";
 
-/** Marcador que localiza los textos con implicación legal pendientes de redacción. */
-export const MARCA_PENDIENTE_LEGAL = "[PENDIENTE LEGAL]";
 
 // --- Textos dirigidos al PACIENTE --------------------------------------------
 
@@ -45,8 +44,9 @@ export const TEXTOS_URGENCIA = {
   botonMedico: "Llamar a mi médico",
   instruccion:
     "Si estás con alguien, pídele que se quede contigo mientras llamas.",
-  /** Aviso con implicación legal: redacción real pendiente de asesoría jurídica. */
-  avisoLegal: `${MARCA_PENDIENTE_LEGAL} Botsy no es un servicio de emergencias ni sustituye la valoración de un profesional sanitario. Ante cualquier duda, llama al 112.`,
+  /** Aviso legal (redacción genérica v1). */
+  avisoLegal:
+    "Botsy no es un servicio de emergencias ni sustituye la valoración de un profesional sanitario. Si crees que tu vida está en peligro, llama de inmediato al número de emergencias de tu país (112 en España, 911/106 en Latinoamérica).",
 } as const;
 
 /**

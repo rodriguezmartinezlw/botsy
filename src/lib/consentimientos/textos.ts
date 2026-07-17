@@ -1,18 +1,18 @@
 /**
- * Textos de consentimiento por tipo (WP-07).
+ * Textos de consentimiento por tipo (WP-07; v1 genérica 2026-07).
  *
- * IMPORTANTE: son un BORRADOR de trabajo (`v0-borrador`), NO el texto legal
- * definitivo. Cada apartado va marcado con `[PENDIENTE LEGAL]` porque el texto
- * real lo debe aprobar la asesoría jurídica (ver PLAN-MAESTRO §6). La estructura
- * sí es la real de una cláusula RGPD: responsable, finalidad, base, conservación,
- * derechos y revocación. Módulo puro (sin dependencias), reutilizable en la app
- * del paciente y en el interstitial.
+ * Versión GENÉRICA conforme al RGPD (arts. 6.1.a, 7 y 9.2.a) con la estructura
+ * completa de una cláusula informada: responsable, finalidad, base, destinatarios
+ * y encargados, conservación, derechos y revocación. Decisión del fundador
+ * (2026-07-17): se usan textos genéricos estándar; la revisión por asesoría
+ * jurídica antes de operar con pacientes reales es RECOMENDABLE, no bloqueante.
+ * Módulo puro (sin dependencias), reutilizable en la app y en el interstitial.
  */
 
 import type { TipoConsentimiento } from "@/types/db";
 
-/** Versión del texto vigente (debe coincidir con la que se persiste al registrar). */
-export const VERSION_TEXTO = "v0-borrador";
+/** Versión del texto vigente (se persiste al registrar cada consentimiento). */
+export const VERSION_TEXTO = "v1-generica-2026-07";
 
 export type ApartadoConsentimiento = { titulo: string; cuerpo: string };
 
@@ -29,10 +29,16 @@ export type TextoConsentimiento = {
 };
 
 const RESPONSABLE =
-  "[PENDIENTE LEGAL] Botsy (denominación social y datos de contacto del responsable del tratamiento pendientes de confirmar). Delegado de Protección de Datos: pendiente de designar.";
+  "El responsable del tratamiento es la entidad titular del servicio Botsy. Puedes contactar con el responsable en materia de protección de datos a través de los canales de contacto indicados en la propia aplicación o por medio de tu centro sanitario.";
+
+const DESTINATARIOS =
+  "Tus datos se comparten únicamente con el equipo sanitario de tu institución que participa en tu seguimiento. Para prestar el servicio se utilizan proveedores tecnológicos que actúan como encargados del tratamiento bajo contrato (alojamiento seguro de datos y procesamiento del lenguaje de la conversación); dichos proveedores no pueden usar tus datos para fines propios. No se ceden datos identificables a terceros: los patrocinadores del programa solo acceden a estadísticas agregadas y anonimizadas.";
 
 const DERECHOS =
-  "[PENDIENTE LEGAL] Puedes ejercer tus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, así como retirar este consentimiento en cualquier momento, desde esta misma pantalla o escribiendo a la dirección de contacto del responsable. También puedes reclamar ante la autoridad de control competente (en España, la AEPD).";
+  "Puedes ejercer en cualquier momento tus derechos de acceso, rectificación, supresión, oposición, limitación y portabilidad, así como retirar este consentimiento desde esta misma pantalla, con efecto inmediato y sin que ello afecte a la licitud del tratamiento previo. También puedes presentar una reclamación ante la autoridad de protección de datos competente en tu país.";
+
+const CONSERVACION_BASE =
+  "Los datos se conservan mientras mantengas tu cuenta y, tras su cierre, durante los plazos que exija la normativa sanitaria y de protección de datos aplicable en tu país; después se suprimen o se anonimizan de forma irreversible.";
 
 export const TEXTOS_CONSENTIMIENTO: Record<
   TipoConsentimiento,
@@ -49,18 +55,15 @@ export const TEXTOS_CONSENTIMIENTO: Record<
       {
         titulo: "Finalidad",
         cuerpo:
-          "[PENDIENTE LEGAL] Registrar el contenido (texto) de tus conversaciones de check-in diario para hacer tu seguimiento de salud, generar tu perfil evolutivo y ponerlo a disposición del profesional sanitario que te atiende. Es imprescindible para poder conversar con Botsy.",
+          "Registrar el contenido (texto) de tus conversaciones de check-in para realizar tu seguimiento de salud, construir tu perfil evolutivo y ponerlo a disposición del equipo sanitario de tu institución. Botsy no diagnostica: registra lo que cuentas y avisa a tu equipo cuando detecta una señal que conviene revisar. Este permiso es imprescindible para poder conversar con Botsy.",
       },
       {
         titulo: "Base legitimadora",
         cuerpo:
-          "[PENDIENTE LEGAL] Tu consentimiento explícito para el tratamiento de datos de salud. Sin él, la app no puede prestar el servicio de check-in.",
+          "Tu consentimiento explícito para el tratamiento de datos de salud (art. 9.2.a RGPD). Sin él, la app no puede prestar el servicio de check-in.",
       },
-      {
-        titulo: "Conservación",
-        cuerpo:
-          "[PENDIENTE LEGAL] Los datos se conservan mientras seas usuario y durante los plazos legales aplicables al historial de seguimiento; después se suprimen o anonimizan.",
-      },
+      { titulo: "Destinatarios y encargados", cuerpo: DESTINATARIOS },
+      { titulo: "Conservación", cuerpo: CONSERVACION_BASE },
       { titulo: "Tus derechos y revocación", cuerpo: DERECHOS },
     ],
   },
@@ -75,22 +78,24 @@ export const TEXTOS_CONSENTIMIENTO: Record<
       {
         titulo: "Finalidad",
         cuerpo:
-          "[PENDIENTE LEGAL] Guardar la grabación de audio de tus check-ins por voz para que el profesional pueda revisarla como apoyo a tu seguimiento. Es un permiso independiente del registro de la conversación.",
+          "Guardar la grabación de audio de tus check-ins por voz para que tu equipo sanitario pueda revisarla como apoyo a tu seguimiento. Es un permiso independiente del registro de la conversación: puedes hablar con Botsy sin otorgarlo y, en ese caso, no se graba nada.",
       },
       {
         titulo: "Base legitimadora",
         cuerpo:
-          "[PENDIENTE LEGAL] Tu consentimiento explícito, específico y separado. Puedes hablar con Botsy sin otorgarlo; en ese caso no se graba nada.",
+          "Tu consentimiento explícito, específico y separado (arts. 7 y 9.2.a RGPD), al tratarse la voz de un dato especialmente protegido.",
       },
+      { titulo: "Destinatarios y encargados", cuerpo: DESTINATARIOS },
       {
         titulo: "Conservación",
         cuerpo:
-          "[PENDIENTE LEGAL] El audio se almacena en un espacio privado con acceso restringido a tu profesional y se conserva durante el plazo definido en la política de retención; caduca o se elimina según dicha política.",
+          "El audio se almacena cifrado en un espacio privado con acceso restringido a tu equipo sanitario. " +
+          CONSERVACION_BASE,
       },
       {
         titulo: "Efecto de la revocación",
         cuerpo:
-          "Si retiras este permiso, a partir de tu siguiente check-in por voz Botsy dejará de grabar el audio de inmediato. Las grabaciones anteriores se gestionan según la política de conservación.",
+          "Si retiras este permiso, a partir de tu siguiente check-in por voz Botsy dejará de grabar el audio de inmediato. Puedes solicitar además la supresión de las grabaciones anteriores ejerciendo tu derecho de supresión.",
       },
       { titulo: "Tus derechos y revocación", cuerpo: DERECHOS },
     ],
@@ -106,17 +111,19 @@ export const TEXTOS_CONSENTIMIENTO: Record<
       {
         titulo: "Finalidad",
         cuerpo:
-          "[PENDIENTE LEGAL] Analizar características acústicas de tu voz (ritmo, pausas, energía, etc.) como señal de cribado —nunca como diagnóstico— para el seguimiento longitudinal. Esta funcionalidad se activará en una fase futura; hoy solo se recoge el consentimiento.",
+          "Analizar características acústicas de tu voz (ritmo, pausas, energía) como señal de cribado —nunca como diagnóstico— para tu seguimiento a lo largo del tiempo. Esta funcionalidad se activará en una fase futura; hoy únicamente se recoge tu autorización, que podrás revisar cuando se active.",
       },
       {
         titulo: "Base legitimadora",
         cuerpo:
-          "[PENDIENTE LEGAL] Tu consentimiento explícito y separado del resto. Es totalmente opcional y no condiciona el uso de la app.",
+          "Tu consentimiento explícito y separado del resto (arts. 7 y 9.2.a RGPD). Es totalmente opcional y no condiciona el uso de la app.",
       },
+      { titulo: "Destinatarios y encargados", cuerpo: DESTINATARIOS },
       {
         titulo: "Conservación",
         cuerpo:
-          "[PENDIENTE LEGAL] Se conservarán preferentemente las características derivadas y fragmentos mínimos de auditoría, con caducidad, según la política de retención.",
+          "Se conservarán preferentemente las características derivadas (no el audio en bruto) y fragmentos mínimos de auditoría con caducidad. " +
+          CONSERVACION_BASE,
       },
       { titulo: "Tus derechos y revocación", cuerpo: DERECHOS },
     ],
@@ -132,17 +139,24 @@ export const TEXTOS_CONSENTIMIENTO: Record<
       {
         titulo: "Finalidad",
         cuerpo:
-          "[PENDIENTE LEGAL] Reutilizar tus datos de salud, previamente seudonimizados, para fines de investigación, generación de evidencia y mejora del servicio. Es un permiso SEPARADO y estrictamente opcional: no otorgarlo no cambia en nada tu seguimiento ni tu atención.",
+          "Reutilizar tus datos de salud, previamente seudonimizados (sin tu nombre ni datos de contacto), para investigación, generación de evidencia científica y mejora del servicio. Es un permiso SEPARADO y estrictamente opcional: no otorgarlo no cambia en nada tu seguimiento ni tu atención.",
       },
       {
         titulo: "Base legitimadora",
         cuerpo:
-          "[PENDIENTE LEGAL] Tu consentimiento explícito, específico y separado del resto. Ninguna funcionalidad de la app depende de él.",
+          "Tu consentimiento explícito, específico y separado del resto (arts. 7 y 9.2.a RGPD). Ninguna funcionalidad de la app depende de él.",
+      },
+      {
+        titulo: "Destinatarios y encargados",
+        cuerpo:
+          "Los resultados de investigación se comparten únicamente de forma agregada y anonimizada. " +
+          DESTINATARIOS,
       },
       {
         titulo: "Conservación",
         cuerpo:
-          "[PENDIENTE LEGAL] Los datos empleados para uso secundario se tratan seudonimizados y se conservan según la política de retención aplicable a investigación.",
+          "Los datos empleados para uso secundario se tratan seudonimizados y se conservan el tiempo necesario para los fines de investigación autorizados. " +
+          CONSERVACION_BASE,
       },
       {
         titulo: "Efecto de la revocación",
