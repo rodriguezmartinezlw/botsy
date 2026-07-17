@@ -16,7 +16,7 @@
  * motor de escalado de WP-04).
  */
 
-import type { EstadoCheckin, NivelRiesgo } from "@/types/db";
+import type { EstadoCheckin, NivelRiesgo, TipoCheckin } from "@/types/db";
 import type { ReglaSenal } from "@/lib/escalado/senales";
 import type { LlamadaHerramienta } from "./openai";
 import type { RepositorioCheckin } from "./loop";
@@ -34,6 +34,8 @@ export type CheckinVoz = {
   vertical: string | null;
   /** ¿Se administra hoy el instrumento? (WP-16). Gating de `registrar_instrumento`. */
   instrumentoActivo: boolean;
+  /** 'checkin' o 'consulta' (WP-24). Ausente = 'checkin' (compatibilidad). */
+  tipo?: TipoCheckin;
 };
 
 /** Repositorio de turno + lectura del estado derivado (idéntico al modo texto). */
@@ -97,7 +99,14 @@ export async function manejarToolVoz(
   // Pertenencia: si no es del usuario de la sesión, no se toca nada.
   if (!checkin) return { ok: false, estado: 404, error: "Check-in no encontrado." };
   if (checkin.estado !== "en_curso") {
-    return { ok: false, estado: 409, error: "Este check-in ya está cerrado." };
+    return {
+      ok: false,
+      estado: 409,
+      error:
+        checkin.tipo === "consulta"
+          ? "Esta conversación ya está cerrada."
+          : "Este check-in ya está cerrado.",
+    };
   }
 
   const reglasSenal = await puerto.cargarReglasSenal(

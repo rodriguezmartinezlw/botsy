@@ -13,7 +13,7 @@ import {
   Sparkles,
   Volume2,
 } from "lucide-react";
-import type { NivelRiesgo, VerticalPaciente } from "@/types/db";
+import type { NivelRiesgo, TipoCheckin, VerticalPaciente } from "@/types/db";
 import { DOMINIOS_CHECKIN, type DominioCheckin } from "@/lib/ia/dominios";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import {
@@ -38,6 +38,7 @@ type RespuestaSesion = {
   token: string;
   modelo: string;
   checkinId: string;
+  tipo: TipoCheckin;
   pacienteId: string;
   fecha: string;
   maxMinutos: number;
@@ -91,14 +92,19 @@ function elegirMimeGrabacion(): string | undefined {
 
 export default function PantallaVoz({
   vertical,
+  tipo = "checkin",
   consentimientoConversacion,
   consentimientoGrabacion,
 }: {
   vertical: VerticalPaciente;
+  /** 'consulta' (WP-24) abre una conversación a demanda: sin checklist ni racha. */
+  tipo?: TipoCheckin;
   consentimientoConversacion: boolean;
   consentimientoGrabacion: boolean;
 }) {
   const router = useRouter();
+  const esConsulta = tipo === "consulta";
+  const hrefTexto = esConsulta ? "/checkin?tipo=consulta" : "/checkin";
 
   const [fase, setFase] = useState<Fase>(
     consentimientoConversacion ? "inicial" : "consentimiento",
@@ -188,11 +194,16 @@ export default function PantallaVoz({
     blob: Blob,
     pacienteId: string,
     fecha: string,
+    checkinId: string,
   ): Promise<string | null> {
     // Best-effort: si la subida falla, no bloquea el cierre (el audio es secundario).
     try {
       const supabase = crearClienteNavegador();
-      const ruta = `${pacienteId}/${fecha}.webm`;
+      // Las consultas (WP-24) llevan el id en la ruta: puede haber varias al
+      // día y no deben pisar el audio del check-in ni el de otra consulta.
+      const ruta = esConsulta
+        ? `${pacienteId}/${fecha}-${checkinId}.webm`
+        : `${pacienteId}/${fecha}.webm`;
       const { error: errSubida } = await supabase.storage
         .from("audios-checkin")
         .upload(ruta, blob, { upsert: true, contentType: "audio/webm" });
@@ -220,10 +231,14 @@ export default function PantallaVoz({
     setFase("conectando");
     setEstado("conectando");
 
-    // 1. Token efímero + check-in (server-side).
+    // 1. Token efímero + sesión (server-side); el tipo decide check-in o consulta.
     let datos: RespuestaSesion;
     try {
-      const res = await fetch("/api/voz/sesion", { method: "POST" });
+      const res = await fetch("/api/voz/sesion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tipo }),
+      });
       if (!res.ok) {
         if (res.status === 401) {
           redirigirALogin();
@@ -412,7 +427,12 @@ export default function PantallaVoz({
       const blob = await detenerGrabadora();
       const info = checkinRef.current;
       if (blob && info) {
-        const ruta = await subirAudio(blob, info.pacienteId, info.fecha);
+        const ruta = await subirAudio(
+          blob,
+          info.pacienteId,
+          info.fecha,
+          info.checkinId,
+        );
         if (ruta) audioPath = ruta;
       }
     } catch {
@@ -458,9 +478,10 @@ export default function PantallaVoz({
   }
 
   async function cambiarATexto() {
-    // Cuelga la voz sin cerrar el check-in y retoma el MISMO check-in por texto.
+    // Cuelga la voz sin cerrar la sesión y sigue por texto (misma modalidad:
+    // check-in o consulta).
     await liberar();
-    router.push("/checkin");
+    router.push(hrefTexto);
   }
 
   // --- Render ---------------------------------------------------------------
@@ -483,7 +504,7 @@ export default function PantallaVoz({
           Ir a mis permisos
         </Link>
         <Link
-          href="/checkin"
+          href={hrefTexto}
           className="flex h-12 items-center justify-center rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-base font-semibold text-primario transition-colors hover:bg-primario-suave"
         >
           Prefiero escribir
@@ -500,15 +521,18 @@ export default function PantallaVoz({
             <Mic className="h-10 w-10" aria-hidden />
           </span>
           <p className="text-lg font-semibold text-texto">
-            Cuando quieras, empezamos a hablar
+            {esConsulta
+              ? "Cuando quieras, te escucho"
+              : "Cuando quieras, empezamos a hablar"}
           </p>
           <p className="text-base text-texto-suave">
-            Te iré preguntando cómo te encuentras. Puedes ver los subtítulos en
-            pantalla y colgar en cualquier momento.
+            {esConsulta
+              ? "Cuéntame lo que necesites, a cualquier hora. Puedes ver los subtítulos en pantalla y colgar en cualquier momento."
+              : "Te iré preguntando cómo te encuentras. Puedes ver los subtítulos en pantalla y colgar en cualquier momento."}
           </p>
           <p className="text-sm text-texto-tenue">
             {consentimientoGrabacion
-              ? "Grabaré el audio de este check-in (diste tu permiso). Podrás retirarlo cuando quieras."
+              ? "Grabaré el audio de esta conversación (diste tu permiso). Podrás retirarlo cuando quieras."
               : "No grabaré el audio (no has dado ese permiso). Hablamos igual."}
           </p>
         </section>
@@ -519,7 +543,7 @@ export default function PantallaVoz({
           className="flex h-16 w-full items-center justify-center gap-3 rounded-[var(--radius-lg)] bg-primario px-6 text-xl font-bold text-white transition-colors hover:bg-primario-fuerte"
         >
           <Mic className="h-6 w-6" aria-hidden />
-          Empezar a hablar
+          {esConsulta ? "Iniciar una conversación" : "Empezar a hablar"}
         </button>
 
         <button
@@ -559,7 +583,7 @@ export default function PantallaVoz({
           {error ?? "Algo no ha ido bien. Puedes usar el chat de texto."}
         </p>
         <Link
-          href="/checkin"
+          href={hrefTexto}
           className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-base font-semibold text-white transition-colors hover:bg-primario-fuerte"
         >
           <Keyboard className="h-5 w-5" aria-hidden />
@@ -590,6 +614,7 @@ export default function PantallaVoz({
         cierre={cierre}
         vertical={vertical}
         checkinId={checkinRef.current?.checkinId ?? ""}
+        esConsulta={esConsulta}
       />
     );
   }
@@ -601,25 +626,28 @@ export default function PantallaVoz({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Checklist visual de dominios */}
-      <section aria-label="Temas del check-in de hoy" className="flex flex-wrap gap-2">
-        {DOMINIOS_CHECKIN.map((d) => {
-          const cubierto = setDominiosCubiertos.has(d.id);
-          return (
-            <span
-              key={d.id}
-              className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
-                cubierto
-                  ? "bg-acento-suave text-acento-fuerte"
-                  : "bg-superficie-suave text-texto-tenue"
-              }`}
-            >
-              {cubierto ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : null}
-              {d.etiqueta}
-            </span>
-          );
-        })}
-      </section>
+      {/* Checklist visual de dominios (solo check-in estructurado; la consulta
+          no recorre dominios, WP-24) */}
+      {!esConsulta && (
+        <section aria-label="Temas del check-in de hoy" className="flex flex-wrap gap-2">
+          {DOMINIOS_CHECKIN.map((d) => {
+            const cubierto = setDominiosCubiertos.has(d.id);
+            return (
+              <span
+                key={d.id}
+                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
+                  cubierto
+                    ? "bg-acento-suave text-acento-fuerte"
+                    : "bg-superficie-suave text-texto-tenue"
+                }`}
+              >
+                {cubierto ? <CheckCircle2 className="h-4 w-4" aria-hidden /> : null}
+                {d.etiqueta}
+              </span>
+            );
+          })}
+        </section>
+      )}
 
       {(riesgo === "contactar" || riesgo === "urgencia") && (
         <div
@@ -672,7 +700,9 @@ export default function PantallaVoz({
               : "Un momento…"}
         </p>
         {grabando && (
-          <p className="text-sm text-texto-tenue">Grabando este check-in</p>
+          <p className="text-sm text-texto-tenue">
+            {esConsulta ? "Grabando esta conversación" : "Grabando este check-in"}
+          </p>
         )}
       </section>
 
@@ -761,46 +791,56 @@ function PantallaCierreVoz({
   cierre,
   vertical,
   checkinId,
+  esConsulta,
 }: {
   cierre: RespuestaFinalizar;
   vertical: VerticalPaciente;
   checkinId: string;
+  esConsulta: boolean;
 }) {
   const recomendacion = recomendacionDelDia(vertical);
   return (
     <div className="relative flex flex-col items-center gap-6 pt-6 text-center">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 top-0 h-32 overflow-hidden"
-      >
-        {PIEZAS_CONFETI.concat(PIEZAS_CONFETI).map((color, i) => (
-          <span
-            key={i}
-            className="confeti-pieza"
-            style={{
-              left: `${(i * 9 + 6) % 100}%`,
-              background: color,
-              animationDelay: `${(i % 5) * 0.15}s`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Confeti sobrio (solo el logro diario del check-in) */}
+      {!esConsulta && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-32 overflow-hidden"
+        >
+          {PIEZAS_CONFETI.concat(PIEZAS_CONFETI).map((color, i) => (
+            <span
+              key={i}
+              className="confeti-pieza"
+              style={{
+                left: `${(i * 9 + 6) % 100}%`,
+                background: color,
+                animationDelay: `${(i % 5) * 0.15}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-acento-suave text-acento-fuerte">
         <CheckCircle2 className="h-9 w-9" aria-hidden />
       </span>
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold text-texto">¡Check-in completado!</h2>
-        <p className="text-lg font-semibold text-primario">
-          {cierre.racha_actual > 1
-            ? `Llevas ${cierre.racha_actual} días seguidos`
-            : "Primer día registrado"}
-        </p>
+        <h2 className="text-2xl font-bold text-texto">
+          {esConsulta ? "Gracias por contármelo" : "¡Check-in completado!"}
+        </h2>
+        {/* La consulta no toca la racha (WP-24): no se muestra contador. */}
+        {!esConsulta && (
+          <p className="text-lg font-semibold text-primario">
+            {cierre.racha_actual > 1
+              ? `Llevas ${cierre.racha_actual} días seguidos`
+              : "Primer día registrado"}
+          </p>
+        )}
       </div>
 
       <section
-        aria-label="Resumen de hoy"
+        aria-label={esConsulta ? "Resumen de la conversación" : "Resumen de hoy"}
         className="w-full rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-5 text-left"
       >
         <p className="text-base leading-relaxed text-texto">{cierre.resumen}</p>

@@ -189,11 +189,13 @@ update public.perfiles set telefono = '+34600555777'
   where id = '00000000-0000-4000-8000-000000000007'; -- Dr. Vega
 
 -- ---------------------------------------------------------------------
--- 3) Cohorte + 45 días de historial. Un DO block recorre las 10 pacientes:
---    datos clínicos, pauta oral (con inicio fechado y 2 discontinuaciones
---    codificadas), asignación de programa, y 45 días de check-ins /
---    observaciones (ánimo/ansiedad/estrés = distrés variado) / tomas
---    (adherencia por paciente). Deterministic (hashtext) => reproducible.
+-- 3) Cohorte + 45 días de historial HASTA AYER (WP-24 §D: el día actual
+--    queda LIBRE para la demo — el check-in de hoy lo hace la persona en
+--    vivo). Un DO block recorre las 10 pacientes: datos clínicos, pauta oral
+--    (con inicio fechado y 2 discontinuaciones codificadas), asignación de
+--    programa, y 45 días de check-ins / observaciones (ánimo/ansiedad/estrés
+--    = distrés variado) / tomas (adherencia por paciente). Deterministic
+--    (hashtext) => reproducible.
 -- ---------------------------------------------------------------------
 do $$
 declare
@@ -260,7 +262,7 @@ begin
       hora_checkin     = '10:00',
       racha_actual     = 12,
       racha_maxima     = 30,
-      ultimo_checkin   = current_date
+      ultimo_checkin   = current_date - 1  -- WP-24 §D: el seed llega hasta AYER
       where id = v_pac[i];
 
     -- Pauta oral (con inicio fechado y discontinuación codificada si procede).
@@ -283,12 +285,13 @@ begin
       v_pac[i], v_prog_id, 'activo', current_date - v_inicio[i], v_garcia
     ) on conflict do nothing;
 
-    -- 45 días de historial.
+    -- 45 días de historial que terminan AYER (current_date - 1): el día
+    -- actual queda libre para la demo (WP-24 §D).
     for d in 0..44 loop
       v_dias_atras := 44 - d;
-      v_fecha := current_date - v_dias_atras;
+      v_fecha := current_date - 1 - v_dias_atras;
 
-      -- Cumplimiento del check-in (protagonista SIEMPRE registra hoy, para el guion).
+      -- Cumplimiento del check-in (protagonista SIEMPRE registra ayer, para el guion).
       if not (i = 1 and d = 44)
          and (abs(hashtext(v_pac[i]::text || d::text)) % 100) >= (v_cumpl[i] * 100) then
         continue;
@@ -343,7 +346,8 @@ end $$;
 
 -- ---------------------------------------------------------------------
 -- 4) Alertas en los CUATRO estados + disposiciones con desenlace.
---    Cubre: nueva (María, fiebre HOY), vista (Lucía), resuelta (varias con
+--    Cubre: nueva (María, fiebre AYER — el día actual queda libre, WP-24 §D),
+--    vista (Lucía), resuelta (varias con
 --    disposición + desenlace) y descartada (Beatriz). >= 5 disposiciones y 4
 --    "resuelto_sin_evento" sobre contactar/urgencia (proxy de urgencias
 --    evitadas del ROI). Los tiempos permiten señal->alerta y alerta->disposición.
@@ -358,8 +362,8 @@ begin
   select id into v_mot_disp from public.catalogo_motivos where ambito = 'disposicion' and codigo = 'contactado_sin_hallazgos' limit 1;
   select id into v_mot_desc from public.catalogo_motivos where ambito = 'descarte'    and codigo = 'falso_positivo'        limit 1;
 
-  -- ===== María (…003): fiebre HOY -> contactar NUEVA (sin disposición) =====
-  v_pac := '00000000-0000-4000-8000-000000000003'; v_fecha := current_date;
+  -- ===== María (…003): fiebre AYER -> contactar NUEVA (sin disposición) =====
+  v_pac := '00000000-0000-4000-8000-000000000003'; v_fecha := current_date - 1;
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.observaciones (checkin_id, paciente_id, dominio, codigo, valor_num, confianza, origen)
   values (v_ck, v_pac, 'sintoma_fisico', 'fiebre', 38.2, 0.9, 'conversacion');
@@ -369,14 +373,14 @@ begin
     (v_ck, 'asistente', 'Gracias por contármelo. Voy a avisar a tu equipo para que te contacten. Mantente en reposo y con líquidos.', 3);
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, creado_en)
   values (v_pac, v_ck, 'contactar', 'Fiebre en terapia oral',
-    jsonb_build_object('detalle', jsonb_build_array('Fiebre 38.2 °C reportada en el check-in de hoy.'),
+    jsonb_build_object('detalle', jsonb_build_array('Fiebre 38.2 °C reportada en el último check-in.'),
       'fragmento', 'tengo treinta y ocho y dos'), 'nueva', (v_fecha + time '09:30')::timestamptz);
 
   -- ===== Rosa (…011): contactar 15 d -> RESUELTA, resuelto_sin_evento =====
   v_pac := '00000000-0000-4000-8000-000000000011'; v_fecha := current_date - 15;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"sintomas_fisicos": true}'::jsonb, 'Check-in con síntoma digestivo.', 'contactar', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'contactar', 'Diarrea intensa',
@@ -390,7 +394,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000004'; v_fecha := current_date - 25;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'voz', 'completado', '{"dolor": true}'::jsonb, 'Check-in con dolor.', 'contactar', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'contactar', 'Dolor alto sostenido',
@@ -404,7 +408,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000014'; v_fecha := current_date - 20;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"animo": true}'::jsonb, 'Check-in con ánimo bajo.', 'vigilancia', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'vigilancia', 'Ánimo bajo sostenido',
@@ -418,7 +422,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000013'; v_fecha := current_date - 24;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"sintomas_fisicos": true}'::jsonb, 'Check-in con toxicidad.', 'contactar', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'contactar', 'Toxicidad mantenida',
@@ -432,7 +436,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000012'; v_fecha := current_date - 5;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"animo": true}'::jsonb, 'Check-in con ánimo bajo.', 'vigilancia', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.mensajes (checkin_id, rol, contenido, orden) values
     (v_ck, 'asistente', 'Hola Lucía, ¿cómo llevas el ánimo estos días?', 1),
@@ -447,7 +451,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000015'; v_fecha := current_date - 12;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'voz', 'completado', '{"sintomas_fisicos": true}'::jsonb, 'Check-in con fiebre en tratamiento activo.', 'urgencia', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.observaciones (checkin_id, paciente_id, dominio, codigo, valor_num, confianza, origen)
     values (v_ck, v_pac, 'sintoma_fisico', 'fiebre', 38.6, 0.9, 'conversacion');
@@ -463,7 +467,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000017'; v_fecha := current_date - 9;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"sintomas_fisicos": true}'::jsonb, 'Check-in con náuseas.', 'contactar', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'contactar', 'Vómitos que impiden la ingesta',
@@ -477,7 +481,7 @@ begin
   v_pac := '00000000-0000-4000-8000-000000000018'; v_fecha := current_date - 18;
   insert into public.checkins (paciente_id, fecha, canal, estado, dominios_cubiertos, resumen, riesgo, finalizado_en, creado_en)
     values (v_pac, v_fecha, 'texto', 'completado', '{"sintomas_fisicos": true}'::jsonb, 'Check-in con dato dudoso.', 'contactar', (v_fecha + time '09:05')::timestamptz, (v_fecha + time '09:00')::timestamptz)
-    on conflict (paciente_id, fecha) do nothing;
+    on conflict (paciente_id, fecha) where tipo = 'checkin' do nothing; -- índice único parcial (0020)
   select id into v_ck from public.checkins where paciente_id = v_pac and fecha = v_fecha limit 1;
   insert into public.alertas (paciente_id, checkin_id, nivel, motivo, evidencia, estado, motivo_descarte, gestionada_por, gestionada_en, creado_en)
     values (v_pac, v_ck, 'contactar', 'Diarrea intensa',

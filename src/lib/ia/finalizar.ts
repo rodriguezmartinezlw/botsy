@@ -12,10 +12,14 @@
  * (Next 16): aquí se recibe ya el `userId` autenticado y el cliente de servidor,
  * y todas las escrituras filtran por `paciente_id = userId` (defensa en
  * profundidad).
+ *
+ * WP-24: si la fila es una CONSULTA (`tipo='consulta'`), el cierre es idéntico
+ * (resumen + reconciliación + evaluación determinista de reglas) EXCEPTO la
+ * racha, que no se calcula ni se actualiza (exclusiva del check-in diario).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BaseDatos, NivelRiesgo } from "@/types/db";
+import type { BaseDatos, NivelRiesgo, TipoCheckin } from "@/types/db";
 import {
   calcularRacha,
   construirResumen,
@@ -31,6 +35,8 @@ import {
 
 export type DatosCierre = {
   estado: "completado";
+  /** 'checkin' o 'consulta' (WP-24): la UI adapta la pantalla de cierre. */
+  tipo: TipoCheckin;
   resumen: string;
   riesgo: NivelRiesgo | null;
   telefono_medico: string | null;
@@ -61,11 +67,18 @@ export async function finalizarCheckin(
 ): Promise<ResultadoCierre> {
   const { data: checkin } = await supabase
     .from("checkins")
-    .select("id, estado, fecha, riesgo, resumen, dominios_cubiertos, creado_en")
+    .select(
+      "id, tipo, estado, fecha, riesgo, resumen, dominios_cubiertos, creado_en",
+    )
     .eq("id", checkinId)
     .eq("paciente_id", userId)
     .maybeSingle();
   if (!checkin) return { ok: false, estado: 404, error: "Check-in no encontrado." };
+
+  // WP-24: la consulta a demanda comparte TODO el cierre (resumen,
+  // reconciliación y evaluación de reglas — una fiebre contada en consulta
+  // escala igual), salvo la racha, que es EXCLUSIVA del check-in diario.
+  const esConsulta = checkin.tipo === "consulta";
 
   const { data: paciente } = await supabase
     .from("pacientes")
@@ -79,6 +92,7 @@ export async function finalizarCheckin(
       ok: true,
       datos: {
         estado: "completado",
+        tipo: checkin.tipo,
         resumen: checkin.resumen ?? "",
         riesgo: checkin.riesgo,
         telefono_medico: paciente?.telefono_medico ?? null,
@@ -102,14 +116,16 @@ export async function finalizarCheckin(
       supabase.from("perfiles").select("nombre").eq("id", userId).maybeSingle(),
     ]);
 
-  const nuevaRacha = calcularRacha(
-    {
-      racha_actual: paciente?.racha_actual ?? 0,
-      racha_maxima: paciente?.racha_maxima ?? 0,
-      ultimo_checkin: paciente?.ultimo_checkin ?? null,
-    },
-    checkin.fecha,
-  );
+  // La racha SOLO se calcula/actualiza para el check-in estructurado (WP-24):
+  // una consulta no suma días ni mueve `ultimo_checkin`.
+  const rachaPrevia = {
+    racha_actual: paciente?.racha_actual ?? 0,
+    racha_maxima: paciente?.racha_maxima ?? 0,
+    ultimo_checkin: paciente?.ultimo_checkin ?? null,
+  };
+  const nuevaRacha = esConsulta
+    ? rachaPrevia
+    : calcularRacha(rachaPrevia, checkin.fecha);
 
   // Escalado determinista (WP-04): evalúa TODAS las reglas del check-in, crea
   // alertas idempotentes + auditoría y sube el riesgo (nunca lo baja).
@@ -145,6 +161,7 @@ export async function finalizarCheckin(
       tomas: (tomas ?? []).map((t) => ({ estado: t.estado })),
       rachaActual: nuevaRacha.racha_actual,
       riesgo: riesgoFinal,
+      tipo: checkin.tipo,
     });
 
   const duracionSeg = Math.max(
@@ -172,14 +189,16 @@ export async function finalizarCheckin(
     .eq("paciente_id", userId);
   if (errCheckin) return { ok: false, estado: 500, error: "No se pudo cerrar el check-in." };
 
-  await supabase
-    .from("pacientes")
-    .update({
-      racha_actual: nuevaRacha.racha_actual,
-      racha_maxima: nuevaRacha.racha_maxima,
-      ultimo_checkin: nuevaRacha.ultimo_checkin,
-    })
-    .eq("id", userId);
+  if (!esConsulta) {
+    await supabase
+      .from("pacientes")
+      .update({
+        racha_actual: nuevaRacha.racha_actual,
+        racha_maxima: nuevaRacha.racha_maxima,
+        ultimo_checkin: nuevaRacha.ultimo_checkin,
+      })
+      .eq("id", userId);
+  }
 
   // Segunda pasada estructurada (best-effort; no tumba el cierre).
   const recon = await reconciliar(checkinId);
@@ -188,6 +207,7 @@ export async function finalizarCheckin(
     ok: true,
     datos: {
       estado: "completado",
+      tipo: checkin.tipo,
       resumen,
       riesgo: riesgoFinal,
       telefono_medico: paciente?.telefono_medico ?? null,

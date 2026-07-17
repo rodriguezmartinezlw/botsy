@@ -9,7 +9,7 @@ import {
   Send,
   Sparkles,
 } from "lucide-react";
-import type { NivelRiesgo, VerticalPaciente } from "@/types/db";
+import type { NivelRiesgo, TipoCheckin, VerticalPaciente } from "@/types/db";
 import { DOMINIOS_CHECKIN, type DominioCheckin } from "@/lib/ia/dominios";
 import { recomendacionDelDia } from "./recomendaciones";
 import PantallaUrgencia from "./PantallaUrgencia";
@@ -63,9 +63,13 @@ const PIEZAS_CONFETI = [
 
 export default function ChatCheckin({
   vertical,
+  tipo = "checkin",
 }: {
   vertical: VerticalPaciente;
+  /** 'consulta' (WP-24) abre una conversación a demanda: sin checklist ni racha. */
+  tipo?: TipoCheckin;
 }) {
+  const esConsulta = tipo === "consulta";
   const [fase, setFase] = useState<Fase>("cargando");
   const [checkinId, setCheckinId] = useState<string | null>(null);
   const [estado, setEstado] = useState<RespuestaIniciar["estado"]>("en_curso");
@@ -80,12 +84,17 @@ export default function ChatCheckin({
 
   const finDeLista = useRef<HTMLDivElement>(null);
 
-  // Iniciar (o retomar) el check-in de hoy al montar.
+  // Iniciar (o retomar) la sesión al montar: el check-in de hoy o, en modo
+  // consulta (WP-24), una conversación nueva.
   useEffect(() => {
     let cancelado = false;
     (async () => {
       try {
-        const res = await fetch("/api/checkin/iniciar", { method: "POST" });
+        const res = await fetch("/api/checkin/iniciar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo }),
+        });
         if (!res.ok) {
           if (res.status === 401) {
             redirigirALogin();
@@ -109,7 +118,7 @@ export default function ChatCheckin({
     return () => {
       cancelado = true;
     };
-  }, []);
+  }, [tipo]);
 
   // Auto-scroll al último mensaje / indicador.
   useEffect(() => {
@@ -189,7 +198,9 @@ export default function ChatCheckin({
     return (
       <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-texto-suave">
         <Loader2 className="h-8 w-8 animate-spin text-primario" aria-hidden />
-        <p className="text-base">Preparando tu check-in…</p>
+        <p className="text-base">
+          {esConsulta ? "Preparando la conversación…" : "Preparando tu check-in…"}
+        </p>
       </div>
     );
   }
@@ -198,7 +209,9 @@ export default function ChatCheckin({
     return (
       <div className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6">
         <p className="text-lg font-semibold text-texto">
-          Ahora mismo no puedo iniciar tu check-in.
+          {esConsulta
+            ? "Ahora mismo no puedo abrir la conversación."
+            : "Ahora mismo no puedo iniciar tu check-in."}
         </p>
         <p className="text-base text-texto-suave">
           Inténtalo de nuevo en unos minutos. Botsy solo registra y pregunta; no
@@ -230,6 +243,7 @@ export default function ChatCheckin({
         cierre={cierre}
         vertical={vertical}
         checkinId={checkinId ?? ""}
+        esConsulta={esConsulta}
       />
     );
   }
@@ -239,30 +253,33 @@ export default function ChatCheckin({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Checklist visual de dominios */}
-      <section aria-label="Temas del check-in de hoy" className="flex flex-col gap-2">
-        <div className="flex flex-wrap gap-2">
-          {DOMINIOS_CHECKIN.map((d) => {
-            const cubierto = setDominiosCubiertos.has(d.id);
-            return (
-              <span
-                key={d.id}
-                className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
-                  cubierto
-                    ? "bg-acento-suave text-acento-fuerte"
-                    : "bg-superficie-suave text-texto-tenue"
-                }`}
-              >
-                {cubierto ? (
-                  <CheckCircle2 className="h-4 w-4" aria-hidden />
-                ) : null}
-                {d.etiqueta}
-                {cubierto ? <span className="sr-only"> (cubierto)</span> : null}
-              </span>
-            );
-          })}
-        </div>
-      </section>
+      {/* Checklist visual de dominios (solo en el check-in estructurado;
+          la consulta no recorre dominios, WP-24) */}
+      {!esConsulta && (
+        <section aria-label="Temas del check-in de hoy" className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            {DOMINIOS_CHECKIN.map((d) => {
+              const cubierto = setDominiosCubiertos.has(d.id);
+              return (
+                <span
+                  key={d.id}
+                  className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${
+                    cubierto
+                      ? "bg-acento-suave text-acento-fuerte"
+                      : "bg-superficie-suave text-texto-tenue"
+                  }`}
+                >
+                  {cubierto ? (
+                    <CheckCircle2 className="h-4 w-4" aria-hidden />
+                  ) : null}
+                  {d.etiqueta}
+                  {cubierto ? <span className="sr-only"> (cubierto)</span> : null}
+                </span>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {(riesgo === "contactar" || riesgo === "urgencia") && (
         <BannerRiesgo nivel={riesgo} />
@@ -299,7 +316,9 @@ export default function ChatCheckin({
       {yaCompletado ? (
         <div className="flex flex-col gap-3 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-5">
           <p className="text-base text-texto-suave">
-            Ya has completado tu check-in de hoy. ¡Buen trabajo!
+            {esConsulta
+              ? "Esta conversación ya está cerrada. Puedes abrir otra cuando quieras."
+              : "Ya has completado tu check-in de hoy. ¡Buen trabajo!"}
           </p>
           <Link
             href="/inicio"
@@ -358,7 +377,7 @@ export default function ChatCheckin({
                 ) : (
                   <CheckCircle2 className="h-5 w-5" aria-hidden />
                 )}
-                Terminar mi check-in
+                {esConsulta ? "Terminar la conversación" : "Terminar mi check-in"}
               </button>
             </div>
           </div>
@@ -420,44 +439,53 @@ function PantallaCierre({
   cierre,
   vertical,
   checkinId,
+  esConsulta,
 }: {
   cierre: RespuestaFinalizar;
   vertical: VerticalPaciente;
   checkinId: string;
+  esConsulta: boolean;
 }) {
   const recomendacion = recomendacionDelDia(vertical);
   return (
     <div className="relative flex flex-col items-center gap-6 pt-6 text-center">
-      {/* Confeti sobrio */}
-      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-32 overflow-hidden">
-        {PIEZAS_CONFETI.concat(PIEZAS_CONFETI).map((color, i) => (
-          <span
-            key={i}
-            className="confeti-pieza"
-            style={{
-              left: `${(i * 9 + 6) % 100}%`,
-              background: color,
-              animationDelay: `${(i % 5) * 0.15}s`,
-            }}
-          />
-        ))}
-      </div>
+      {/* Confeti sobrio (solo el logro diario del check-in) */}
+      {!esConsulta && (
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-32 overflow-hidden">
+          {PIEZAS_CONFETI.concat(PIEZAS_CONFETI).map((color, i) => (
+            <span
+              key={i}
+              className="confeti-pieza"
+              style={{
+                left: `${(i * 9 + 6) % 100}%`,
+                background: color,
+                animationDelay: `${(i % 5) * 0.15}s`,
+              }}
+            />
+          ))}
+        </div>
+      )}
 
       <span className="flex h-16 w-16 items-center justify-center rounded-full bg-acento-suave text-acento-fuerte">
         <CheckCircle2 className="h-9 w-9" aria-hidden />
       </span>
 
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold text-texto">¡Check-in completado!</h2>
-        <p className="text-lg font-semibold text-primario">
-          {cierre.racha_actual > 1
-            ? `Llevas ${cierre.racha_actual} días seguidos`
-            : "Primer día registrado"}
-        </p>
+        <h2 className="text-2xl font-bold text-texto">
+          {esConsulta ? "Gracias por contármelo" : "¡Check-in completado!"}
+        </h2>
+        {/* La consulta no toca la racha (WP-24): no se muestra contador. */}
+        {!esConsulta && (
+          <p className="text-lg font-semibold text-primario">
+            {cierre.racha_actual > 1
+              ? `Llevas ${cierre.racha_actual} días seguidos`
+              : "Primer día registrado"}
+          </p>
+        )}
       </div>
 
       <section
-        aria-label="Resumen de hoy"
+        aria-label={esConsulta ? "Resumen de la conversación" : "Resumen de hoy"}
         className="w-full rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-5 text-left"
       >
         <p className="text-base leading-relaxed text-texto">{cierre.resumen}</p>

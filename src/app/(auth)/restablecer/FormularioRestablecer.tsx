@@ -33,23 +33,27 @@ export default function FormularioRestablecer() {
 
   useEffect(() => {
     let cancelado = false;
-
-    let cliente: ReturnType<typeof crearClienteNavegador>;
-    try {
-      cliente = crearClienteNavegador();
-    } catch {
-      // Backend sin configurar: fallo controlado, sin romper el render.
-      setEstadoEnlace("invalido");
-      return;
-    }
-    setSupabase(cliente);
-    const supabase = cliente;
-
-    const sub = supabase.auth.onAuthStateChange((_evento, session) => {
-      if (!cancelado && session) setEstadoEnlace("listo");
-    });
+    let sub: ReturnType<
+      ReturnType<typeof crearClienteNavegador>["auth"]["onAuthStateChange"]
+    > | null = null;
 
     (async () => {
+      let cliente: ReturnType<typeof crearClienteNavegador>;
+      try {
+        cliente = crearClienteNavegador();
+      } catch {
+        // Backend sin configurar: fallo controlado, sin romper el render.
+        if (!cancelado) setEstadoEnlace("invalido");
+        return;
+      }
+      if (cancelado) return;
+      setSupabase(cliente);
+      const supabase = cliente;
+
+      sub = supabase.auth.onAuthStateChange((_evento, session) => {
+        if (!cancelado && session) setEstadoEnlace("listo");
+      });
+
       const params = new URLSearchParams(window.location.search);
       if (params.get("error_description") || params.get("error")) {
         if (!cancelado) setEstadoEnlace("invalido");
@@ -88,10 +92,9 @@ export default function FormularioRestablecer() {
 
     return () => {
       cancelado = true;
-      sub.data.subscription.unsubscribe();
+      sub?.data.subscription.unsubscribe();
     };
     // Se ejecuta una sola vez al montar (el cliente se crea dentro).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function alEnviar(evento: React.FormEvent<HTMLFormElement>) {

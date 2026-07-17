@@ -27,6 +27,12 @@ export type VerticalPaciente =
   | "general";
 export type CanalCheckin = "texto" | "voz";
 export type EstadoCheckin = "en_curso" | "completado" | "abandonado";
+/**
+ * Tipo de sesión de conversación (WP-24):
+ *  - 'checkin'  : el check-in estructurado del día (máx. 1/día, alimenta racha).
+ *  - 'consulta' : conversación a demanda, sin límite diario (no toca la racha).
+ */
+export type TipoCheckin = "checkin" | "consulta";
 export type NivelRiesgo = "normal" | "vigilancia" | "contactar" | "urgencia";
 export type RolMensaje = "asistente" | "paciente";
 export type DominioObservacion =
@@ -138,6 +144,8 @@ export type Checkin = {
   id: string;
   paciente_id: string;
   fecha: string;
+  /** 'checkin' (estructurado, 1/día) o 'consulta' (a demanda, ilimitada). WP-24. */
+  tipo: TipoCheckin;
   canal: CanalCheckin | null;
   estado: EstadoCheckin;
   dominios_cubiertos: Json;
@@ -454,6 +462,7 @@ export type CheckinInsert = {
   id?: string;
   paciente_id: string;
   fecha: string;
+  tipo?: TipoCheckin;
   canal?: CanalCheckin | null;
   estado?: EstadoCheckin;
   dominios_cubiertos?: Json;

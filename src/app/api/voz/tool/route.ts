@@ -49,7 +49,7 @@ export async function POST(request: Request): Promise<Response> {
       async cargarCheckinPropio(id, userId) {
         const { data: checkin } = await supabase
           .from("checkins")
-          .select("id, estado, riesgo, dominios_cubiertos, fecha")
+          .select("id, tipo, estado, riesgo, dominios_cubiertos, fecha")
           .eq("id", id)
           .eq("paciente_id", userId) // pertenencia
           .maybeSingle();
@@ -61,12 +61,12 @@ export async function POST(request: Request): Promise<Response> {
           .eq("id", userId)
           .maybeSingle();
 
-        // ¿Se administra hoy el instrumento? (WP-16). Gating de la tool.
-        const instrumento = await obtenerContextoInstrumento(
-          supabase,
-          userId,
-          checkin.fecha,
-        );
+        // ¿Se administra hoy el instrumento? (WP-16). Gating de la tool. En
+        // consulta (WP-24) nunca: el termómetro es del check-in estructurado.
+        const instrumento =
+          checkin.tipo === "checkin"
+            ? await obtenerContextoInstrumento(supabase, userId, checkin.fecha)
+            : null;
 
         return {
           id: checkin.id,
@@ -77,6 +77,7 @@ export async function POST(request: Request): Promise<Response> {
           dominiosCubiertos: parsearDominiosCubiertos(checkin.dominios_cubiertos),
           vertical: paciente?.vertical ?? null,
           instrumentoActivo: instrumento?.administrar === true,
+          tipo: checkin.tipo,
         };
       },
 

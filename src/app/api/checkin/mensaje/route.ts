@@ -53,13 +53,18 @@ export async function POST(request: Request): Promise<Response> {
     // Verificación de pertenencia: el check-in debe ser del paciente de la sesión.
     const { data: checkin } = await supabase
       .from("checkins")
-      .select("id, estado, riesgo, dominios_cubiertos, fecha")
+      .select("id, tipo, estado, riesgo, dominios_cubiertos, fecha")
       .eq("id", checkinId)
       .eq("paciente_id", user.id)
       .maybeSingle();
     if (!checkin) return respuestaError("Check-in no encontrado.", 404);
     if (checkin.estado !== "en_curso") {
-      return respuestaError("Este check-in ya está cerrado.", 409);
+      return respuestaError(
+        checkin.tipo === "consulta"
+          ? "Esta conversación ya está cerrada."
+          : "Este check-in ya está cerrado.",
+        409,
+      );
     }
 
     // Gating server-side (WP-11 v2 §A.3): módulo de texto del programa.
@@ -96,7 +101,9 @@ export async function POST(request: Request): Promise<Response> {
       { rol: "user", contenido: texto },
     ];
 
-    const contexto = await construirContexto(user.id);
+    // WP-24: el guion depende del tipo de la sesión que se continúa (el de
+    // consulta escucha a demanda, sin checklist de dominios).
+    const contexto = await construirContexto(user.id, checkin.tipo);
     const instrucciones = construirInstrucciones(contexto);
     const dominiosPrevios = parsearDominiosCubiertos(checkin.dominios_cubiertos);
 
@@ -127,7 +134,11 @@ export async function POST(request: Request): Promise<Response> {
           vertical: contexto.vertical,
           dominiosYaCubiertos: dominiosPrevios,
           reglasSenal,
-          instrumentoActivo: contexto.instrumento?.administrar === true,
+          // El termómetro pertenece al check-in estructurado; en consulta no
+          // se ofrece (WP-24).
+          instrumentoActivo:
+            checkin.tipo === "checkin" &&
+            contexto.instrumento?.administrar === true,
         },
       });
     } catch {

@@ -49,6 +49,9 @@ export const DOMINIOS_CHECKLIST = [
 export const MOMENTOS_PAUTA = ["mañana", "mediodía", "noche"] as const;
 export const ESTADOS_TOMA = ["tomada", "omitida", "desconocido"] as const;
 
+/** Tipos de sesión conversacional (WP-24): check-in estructurado o consulta. */
+export const TIPOS_CHECKIN = ["checkin", "consulta"] as const;
+
 /** Código clínico corto en snake_case ascii, p. ej. `dolor_cabeza`, `disnea`. */
 const codigoClinico = z
   .string()
@@ -184,6 +187,20 @@ export const esquemaCuerpoFinalizar = z
     checkinId: z.string().uuid(),
   })
   .strict();
+
+/**
+ * Cuerpo (opcional) de `POST /api/checkin/iniciar` y `POST /api/voz/sesion`
+ * (WP-24). `tipo` decide si se abre el check-in estructurado del día o una
+ * consulta a demanda; por defecto 'checkin'. Ambos endpoints toleran un cuerpo
+ * ausente (compatibilidad con la app antes de WP-24 → check-in).
+ */
+export const esquemaCuerpoIniciar = z
+  .object({
+    tipo: z.enum(TIPOS_CHECKIN).default("checkin"),
+  })
+  .strict();
+
+export type CuerpoIniciar = z.infer<typeof esquemaCuerpoIniciar>;
 
 /**
  * Cuerpo de `POST /api/voz/tool`: la tool-call reenviada desde el data channel

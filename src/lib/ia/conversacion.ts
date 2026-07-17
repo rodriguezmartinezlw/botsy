@@ -18,6 +18,7 @@ import type {
   EstadoToma,
   Json,
   NivelRiesgo,
+  TipoCheckin,
   VerticalPaciente,
 } from "@/types/db";
 import type { HerramientaChat } from "./openai";
@@ -136,6 +137,11 @@ export type ContextoCheckin = {
   programa?: ProgramaContexto | null;
   /** Instrumento a administrar hoy (WP-16); null/ausente = no aplica. */
   instrumento?: InstrumentoContexto | null;
+  /**
+   * Tipo de sesión (WP-24). 'consulta' cambia el guion (escucha a demanda, sin
+   * recorrer la checklist de dominios). Ausente/`checkin` = check-in diario.
+   */
+  tipo?: TipoCheckin;
 };
 
 /** Extrae los dominios de checklist marcados en `checkins.dominios_cubiertos`. */
@@ -158,6 +164,7 @@ export function parsearDominiosCubiertos(valor: Json | null): DominioCheckin[] {
  */
 export async function construirContexto(
   pacienteId: string,
+  tipo: TipoCheckin = "checkin",
 ): Promise<ContextoCheckin> {
   const { crearClienteServidor } = await import("@/lib/supabase/server");
   const supabase = await crearClienteServidor();
@@ -207,11 +214,15 @@ export async function construirContexto(
     .order("creado_en", { ascending: false })
     .limit(20);
 
+  // Solo el check-in ESTRUCTURADO de hoy (desde WP-24 pueden convivir varias
+  // filas por fecha: el check-in + N consultas; sin el filtro, maybeSingle()
+  // fallaría). Las consultas no llevan checklist de dominios.
   const { data: checkinHoy } = await supabase
     .from("checkins")
     .select("dominios_cubiertos")
     .eq("paciente_id", pacienteId)
     .eq("fecha", fechaHoy)
+    .eq("tipo", "checkin")
     .maybeSingle();
 
   // Programa de monitorización activo (WP-11 v2) + instrumento de hoy (WP-16).
@@ -262,6 +273,7 @@ export async function construirContexto(
     ),
     programa,
     instrumento,
+    tipo,
   };
 }
 
@@ -276,10 +288,15 @@ function primerNombre(nombre: string): string {
 /**
  * Saludo de apertura (§2.2, paso 1). Determinista y cálido: no requiere una
  * llamada al LLM, de modo que iniciar el check-in funciona siempre y sin coste.
+ * En modo consulta (WP-24) la apertura invita a contar lo que la persona
+ * necesite, sin guion de check-in.
  */
 export function construirApertura(contexto: ContextoCheckin): string {
   const nombre = primerNombre(contexto.nombre);
   const saludo = nombre ? `Hola ${nombre}` : "Hola";
+  if (contexto.tipo === "consulta") {
+    return `${saludo}, soy Botsy. Te escucho: cuéntame qué necesitas, sin prisa.`;
+  }
   return `${saludo}, soy Botsy. ¿Cómo te encuentras hoy? Cuéntame con tus palabras cómo ha ido tu día.`;
 }
 
@@ -400,11 +417,71 @@ Hoy toca el termómetro de malestar. Introdúcelo con calidez, en un solo turno:
 `;
 }
 
+/** Bloque de reglas clínicas innegociables, compartido por ambos guiones. */
+const REGLAS_CLINICAS = `# Reglas clínicas INNEGOCIABLES
+- NO diagnosticas. No pones nombre a enfermedades ni interpretas causas ante la persona.
+- NO recomiendas fármacos ni dosis, ni cambias la pauta del médico. Nada de lo que digas puede contradecir a su profesional.
+- NO minimizas los síntomas de alarma ("no será nada" está prohibido). Ante una señal, mantén la calma y sugiere contactar con su médico.
+- Distingue siempre "señal detectada" de "diagnóstico".
+- Si te preguntan algo médico que excede el registro (dudas de medicación, si algo es grave, ajustes de tratamiento), responde con amabilidad: "eso es mejor que lo consultes con tu médico". (RF-CV-08)
+- Recuerda a la persona, si viene a cuento, que hablas como asistente y que no sustituyes a su médico.`;
+
+/**
+ * Guion del MODO CONSULTA (WP-24): la persona ha abierto una conversación a
+ * demanda (un síntoma nuevo, una duda, un malestar) fuera del check-in diario.
+ * Escucha, registra con las mismas herramientas y evalúa señales de alarma,
+ * pero NO recorre la checklist de dominios ni administra instrumentos. Cierre
+ * natural cuando la persona termine. Función pura (testeable sin red ni BD).
+ */
+function construirInstruccionesConsulta(contexto: ContextoCheckin): string {
+  const edad = contexto.edad != null ? `${contexto.edad} años` : "edad no registrada";
+  const condiciones =
+    contexto.condiciones.length > 0
+      ? contexto.condiciones.join(", ")
+      : "sin condiciones registradas";
+
+  return `Eres Botsy, un asistente de salud. Esto NO es el check-in diario: la persona ha abierto una CONVERSACIÓN porque quiere contarte algo AHORA (un síntoma nuevo, una duda, un malestar). Hablas en español de España (es-ES), con tono cálido, cercano y sencillo. La persona puede ser mayor: usa frases CORTAS, vocabulario claro, y haz UNA sola pregunta por turno. Nunca escribas párrafos largos.
+
+# Quién es la persona
+- Nombre: ${contexto.nombre || "(desconocido)"}
+- ${edad}. Vertical clínica: ${contexto.vertical}. Condiciones: ${condiciones}.
+
+# Pautas de medicación de hoy (por si menciona su medicación)
+${lineaPautas(contexto.pautasHoy)}
+
+# Memoria de días anteriores (úsala con naturalidad; no la recites entera)
+- Resumen de la última conversación: ${contexto.resumenUltimoCheckin ?? "(no hay)"}
+- Observaciones recientes (últimos 7 días):
+${lineaObservaciones(contexto.observacionesRecientes)}
+
+# Objetivo de la conversación (modo consulta, a demanda)
+La persona quiere contarte algo AHORA. Escúchala:
+1. Deja que cuente lo que necesita, con preguntas abiertas y sin prisa. Repregunta con delicadeza solo para aclarar lo clínicamente relevante.
+2. REGISTRA cada dato clínico que aparezca con las herramientas (registrar_observacion, registrar_toma).
+3. Evalúa si hay señales de alarma y usa senal_alarma exactamente igual que en un check-in: una fiebre o un síntoma grave contados aquí importan igual.
+4. NO recorras la checklist de dominios del check-in diario. No conviertas la conversación en un interrogatorio: ella marca el tema.
+5. Cierra cuando la persona termine: agradece con calma y usa finalizar_checkin con un resumen breve de lo hablado.
+
+# Uso de las herramientas (obligatorio para registrar datos)
+- registrar_observacion: por cada dato clínico (dolor con intensidad 0-10, síntoma, ánimo, sueño...). Usa un 'codigo' corto en snake_case ascii (p. ej. dolor_cabeza, disnea, animo_bajo) y una 'confianza' entre 0 y 1.
+- registrar_toma: por cada confirmación de medicación, con el pauta_id de la lista de arriba, el 'momento' (mañana | mediodía | noche) y el 'estado' (tomada | omitida | desconocido).
+- senal_alarma: SOLO si detectas una posible señal de aviso (síntoma de alarma, combinación peligrosa, no-adherencia crítica, ideas de hacerse daño). No la uses para molestias leves.
+- finalizar_checkin: para cerrar la conversación, con un 'resumen' cálido de 1-3 frases.
+No inventes datos: registra únicamente lo que la persona dice. Si no estás seguro, repregunta.
+
+${REGLAS_CLINICAS}`;
+}
+
 /**
  * System prompt en español que implementa el flujo §2.2 y las reglas clínicas
  * innegociables de CLAUDE.md. Función pura (testeable sin red ni BD).
+ * Con `contexto.tipo === 'consulta'` (WP-24) devuelve el guion de consulta a
+ * demanda (sin checklist de dominios ni instrumento).
  */
 export function construirInstrucciones(contexto: ContextoCheckin): string {
+  if (contexto.tipo === "consulta") {
+    return construirInstruccionesConsulta(contexto);
+  }
   const dominiosActivos = contexto.programa?.dominios ?? null;
   const { pendientes, hechos } = lineaDominios(
     contexto.dominiosCubiertos,
@@ -457,13 +534,7 @@ ${bloqueInstrumento}
 - finalizar_checkin: para cerrar, con un 'resumen' cálido de 1-3 frases.
 No inventes datos: registra únicamente lo que la persona dice. Si no estás seguro, repregunta.
 
-# Reglas clínicas INNEGOCIABLES
-- NO diagnosticas. No pones nombre a enfermedades ni interpretas causas ante la persona.
-- NO recomiendas fármacos ni dosis, ni cambias la pauta del médico. Nada de lo que digas puede contradecir a su profesional.
-- NO minimizas los síntomas de alarma ("no será nada" está prohibido). Ante una señal, mantén la calma y sugiere contactar con su médico.
-- Distingue siempre "señal detectada" de "diagnóstico".
-- Si te preguntan algo médico que excede el registro (dudas de medicación, si algo es grave, ajustes de tratamiento), responde con amabilidad: "eso es mejor que lo consultes con tu médico". (RF-CV-08)
-- Recuerda a la persona, si viene a cuento, que hablas como asistente y que no sustituyes a su médico.`;
+${REGLAS_CLINICAS}`;
 }
 
 // --- Definición NEUTRA de tools ---------------------------------------------
@@ -621,6 +692,8 @@ export type DatosResumen = {
   tomas: { estado: EstadoToma }[];
   rachaActual: number;
   riesgo: NivelRiesgo | null;
+  /** 'consulta' (WP-24) omite la racha y el cierre "mañana seguimos". */
+  tipo?: TipoCheckin;
 };
 
 /**
@@ -657,7 +730,10 @@ export function construirResumen(datos: DatosResumen): string {
     );
   }
 
-  if (datos.rachaActual > 1) {
+  if (datos.tipo === "consulta") {
+    // La consulta no alimenta la racha (WP-24): cierre cálido sin contador.
+    partes.push("Gracias por contármelo. Aquí me tienes cuando me necesites.");
+  } else if (datos.rachaActual > 1) {
     partes.push(`Llevas ${datos.rachaActual} días seguidos cuidándote. ¡Muy bien!`);
   } else {
     partes.push("Buen comienzo. Mañana seguimos.");

@@ -52,11 +52,14 @@ async function cargarEstado(): Promise<EstadoInicio> {
       .maybeSingle();
 
     const fecha = fechaHoyEnZona(perfil?.zona_horaria ?? "Europe/Madrid");
+    // Solo el check-in ESTRUCTURADO de hoy: desde WP-24 pueden convivir varias
+    // filas por fecha (check-in + consultas) y sin el filtro maybeSingle() falla.
     const { data: checkin } = await supabase
       .from("checkins")
       .select("estado")
       .eq("paciente_id", user.id)
       .eq("fecha", fecha)
+      .eq("tipo", "checkin")
       .maybeSingle();
 
     const { data: filasConsent } = await supabase
@@ -106,10 +109,15 @@ export default async function InicioPage() {
   const enCurso = estadoCheckinHoy === "en_curso";
 
   const textoEstado = completado
-    ? "Ya has hecho tu check-in de hoy. ¡Gracias por cuidarte!"
+    ? "Check-in de hoy completado ✓ — puedo escucharte cuando quieras."
     : enCurso
       ? "Tienes un check-in a medias. ¿Lo terminamos?"
       : "Aún no has hecho tu check-in de hoy, tu conversación diaria conmigo.";
+
+  // WP-24: los dos botones grandes SIEMPRE visibles. Con el check-in pendiente
+  // van al check-in (voz/texto); con el día hecho abren una CONSULTA a demanda.
+  const hrefVoz = completado ? "/checkin/voz?tipo=consulta" : "/checkin/voz";
+  const hrefTexto = completado ? "/checkin?tipo=consulta" : "/checkin";
 
   return (
     <div className="flex flex-col gap-8">
@@ -175,33 +183,36 @@ export default async function InicioPage() {
         className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6"
       >
         <p className="text-base text-texto-suave">{textoEstado}</p>
-        {completado ? (
+        {completado && (
+          <p className="text-base font-medium text-texto">
+            Cuéntame lo que necesites, a cualquier hora.
+          </p>
+        )}
+        <div className="flex flex-col gap-3">
+          {/* WP-24: micrófono accesible desde inicio, SIEMPRE. */}
           <Link
-            href="/checkin"
+            href={hrefVoz}
+            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
+          >
+            <Mic className="h-5 w-5" aria-hidden />
+            Hablar con Botsy
+          </Link>
+          <Link
+            href={hrefTexto}
             className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-lg font-semibold text-primario transition-colors hover:bg-primario-suave"
           >
             <MessagesSquare className="h-5 w-5" aria-hidden />
-            Ver mi check-in
+            {enCurso ? "Continuar por escrito" : "Escribir"}
           </Link>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {/* Elegir modo: hablar (voz) o escribir (texto). */}
-            <Link
-              href="/checkin/voz"
-              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
-            >
-              <Mic className="h-5 w-5" aria-hidden />
-              Hablar con Botsy
-            </Link>
+          {completado && (
             <Link
               href="/checkin"
-              className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-lg font-semibold text-primario transition-colors hover:bg-primario-suave"
+              className="flex min-h-11 items-center justify-center px-4 py-2 text-base font-semibold text-primario underline-offset-4 hover:underline"
             >
-              <MessagesSquare className="h-5 w-5" aria-hidden />
-              {enCurso ? "Continuar por escrito" : "Prefiero escribir"}
+              Ver mi check-in de hoy
             </Link>
-          </div>
-        )}
+          )}
+        </div>
       </section>
       )}
 

@@ -6,21 +6,30 @@ import {
   estadoVigenteConsentimientos,
   type FilaConsentimiento,
 } from "@/lib/consentimientos/estado";
-import type { VerticalPaciente } from "@/types/db";
+import { fechaHoyEnZona } from "@/lib/ia/conversacion";
+import type { TipoCheckin, VerticalPaciente } from "@/types/db";
 import PantallaVoz from "./PantallaVoz";
 
 export const metadata: Metadata = { title: "Check-in por voz" };
 
 /**
  * Página del check-in por VOZ. Server Component: resuelve la vertical (para la
- * "recomendación del día" del cierre) y el estado vigente de consentimientos
+ * "recomendación del día" del cierre), el estado vigente de consentimientos
  * (para gatear la conexión: `conversacion` es bloqueante; `voz_grabacion`
- * decide si se graba). Delega la llamada en vivo en el componente cliente, que
- * depende solo de la interfaz `VoiceSession`.
+ * decide si se graba) y el TIPO de sesión (WP-24): con `?tipo=consulta` o con
+ * el check-in de hoy ya completado, la llamada abre una CONSULTA a demanda en
+ * vez de bloquear. Delega la llamada en vivo en el componente cliente.
  */
-export default async function CheckinVozPage() {
+export default async function CheckinVozPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tipo?: string }>;
+}) {
   let vertical: VerticalPaciente = "general";
   let consentimientos = estadoVigenteConsentimientos([]);
+  let checkinHoyCompletado = false;
+
+  const sp = await searchParams;
 
   try {
     const supabase = await crearClienteServidor();
@@ -42,20 +51,48 @@ export default async function CheckinVozPage() {
       consentimientos = estadoVigenteConsentimientos(
         (filas ?? []) as FilaConsentimiento[],
       );
+
+      const { data: perfil } = await supabase
+        .from("perfiles")
+        .select("zona_horaria")
+        .eq("id", user.id)
+        .maybeSingle();
+      const fecha = fechaHoyEnZona(perfil?.zona_horaria ?? "Europe/Madrid");
+
+      // Solo el check-in ESTRUCTURADO de hoy (WP-24: conviven consultas en la
+      // misma fecha; sin el filtro por tipo, maybeSingle() fallaría).
+      const { data: checkin } = await supabase
+        .from("checkins")
+        .select("estado")
+        .eq("paciente_id", user.id)
+        .eq("fecha", fecha)
+        .eq("tipo", "checkin")
+        .maybeSingle();
+      checkinHoyCompletado = checkin?.estado === "completado";
     }
   } catch {
     // Sin Supabase configurado: degradamos a 'general' y sin consentimientos.
   }
 
+  // Con el día completado NO se bloquea: se ofrece una conversación (consulta).
+  const tipo: TipoCheckin =
+    sp.tipo === "consulta" || checkinHoyCompletado ? "consulta" : "checkin";
+  const esConsulta = tipo === "consulta";
+
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Habla con Botsy"
-        descripcion="Cuéntame cómo te encuentras. Yo te voy preguntando lo que falte."
+        descripcion={
+          esConsulta
+            ? "Cuéntame lo que necesites, a cualquier hora."
+            : "Cuéntame cómo te encuentras. Yo te voy preguntando lo que falte."
+        }
         icono={<Mic className="h-6 w-6" aria-hidden />}
       />
       <PantallaVoz
         vertical={vertical}
+        tipo={tipo}
         consentimientoConversacion={consentimientos.conversacion}
         consentimientoGrabacion={consentimientos.voz_grabacion}
       />
