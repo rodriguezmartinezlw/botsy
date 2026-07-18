@@ -69,6 +69,7 @@ export async function GET(request: Request): Promise<Response> {
     const { data: checkins } = await supabase
       .from("checkins")
       .select("paciente_id, fecha")
+      .eq("tipo", "checkin") // WP-24: las consultas no cuentan como check-in del día
       .in("paciente_id", ids)
       .gte("fecha", desdeCheckins);
     const fechasPorPaciente = new Map<string, string[]>();

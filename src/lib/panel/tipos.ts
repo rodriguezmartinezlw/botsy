@@ -45,6 +45,8 @@ export type CabeceraFicha = {
 
 export type ItemCheckin = {
   tipo: "checkin";
+  /** Clase de conversación (WP-24): check-in diario estructurado o consulta a demanda. */
+  conversacion: "checkin" | "consulta";
   id: string;
   /** Timestamp ISO para ordenar cronológicamente. */
   ts: string;

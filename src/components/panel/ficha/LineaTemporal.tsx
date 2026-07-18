@@ -121,6 +121,7 @@ function DetalleCheckin({ item }: { item: ItemCheckin }) {
 }
 
 const CANAL_ETIQUETA = { texto: "Check-in por texto", voz: "Check-in por voz" } as const;
+const CANAL_CONSULTA = { texto: "Consulta por texto", voz: "Consulta por voz" } as const;
 
 const TIPO_CONSENTIMIENTO: Record<TipoConsentimiento, string> = {
   conversacion: "conversación",
@@ -137,7 +138,11 @@ function FilaItem({ item }: { item: ItemTimeline }) {
         <Fila
           icono={c.canal === "voz" ? <Mic className="h-4 w-4" /> : <MessageSquare className="h-4 w-4" />}
           color="#2563eb"
-          titulo={c.canal ? CANAL_ETIQUETA[c.canal] : "Check-in"}
+          titulo={
+            c.conversacion === "consulta"
+              ? (c.canal ? CANAL_CONSULTA[c.canal] : "Consulta")
+              : (c.canal ? CANAL_ETIQUETA[c.canal] : "Check-in")
+          }
           subtitulo={c.resumen ?? undefined}
           ts={c.ts}
           expandible

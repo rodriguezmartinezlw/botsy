@@ -243,7 +243,11 @@ export async function listarPacientes(): Promise<PacienteLista[]> {
       { data: instituciones },
     ] = await Promise.all([
       supabase.from("perfiles").select("id, nombre, avatar_url").in("id", ids),
-      supabase.from("checkins").select("paciente_id, fecha").in("paciente_id", ids),
+      supabase
+        .from("checkins")
+        .select("paciente_id, fecha")
+        .eq("tipo", "checkin") // WP-24: una consulta no cuenta como check-in diario
+        .in("paciente_id", ids),
       supabase
         .from("tomas_medicacion")
         .select("paciente_id, estado, fecha")
@@ -466,7 +470,7 @@ export async function cargarFichaPaciente(
     const { data: checkins } = await supabase
       .from("checkins")
       .select(
-        "id, fecha, canal, estado, riesgo, resumen, finalizado_en, creado_en",
+        "id, tipo, fecha, canal, estado, riesgo, resumen, finalizado_en, creado_en",
       )
       .eq("paciente_id", pacienteId)
       .order("creado_en", { ascending: false });
@@ -576,6 +580,7 @@ export async function cargarFichaPaciente(
     for (const c of checkins ?? []) {
       timeline.push({
         tipo: "checkin",
+        conversacion: c.tipo,
         id: c.id,
         ts: c.finalizado_en ?? c.creado_en,
         fecha: c.fecha,
