@@ -36,31 +36,40 @@ export async function POST(request: Request): Promise<Response> {
 
     // Persistir el TRANSCRIPT de la conversación de voz en `mensajes` (WP-25):
     // antes se perdía y las conversaciones de voz salían vacías en el historial y
-    // en la ficha del profesional. Pertenencia y RLS: se comprueba que el check-in
-    // es del paciente; la RLS `mensajes` es la barrera real. Idempotente: solo si
-    // aún no hay mensajes (evita duplicar en un reintento de cierre).
+    // en la ficha del profesional. La voz NO guarda mensajes durante la
+    // conversación (solo al finalizar), así que es aquí donde entran.
+    //
+    // Pertenencia y RLS: se comprueba que el check-in es del paciente; la RLS
+    // `mensajes` es la barrera real. Idempotencia por ESTADO: si ya está
+    // 'completado', finalize ya corrió una vez → no se re-inserta (evita
+    // duplicar en un reintento de cierre). Los turnos se AÑADEN tras los
+    // mensajes existentes (p. ej. el saludo de un intento previo por texto sobre
+    // el mismo check-in diario), calculando el `orden` desde el máximo actual,
+    // para no pisar nada ni perder el transcript de voz.
     if (transcripcion && transcripcion.length > 0) {
       const { data: propio } = await supabase
         .from("checkins")
-        .select("id")
+        .select("id, estado")
         .eq("id", checkinId)
         .eq("paciente_id", user.id)
         .maybeSingle();
-      if (propio) {
-        const { count } = await supabase
+      if (propio && propio.estado !== "completado") {
+        const { data: ultimo } = await supabase
           .from("mensajes")
-          .select("id", { count: "exact", head: true })
-          .eq("checkin_id", checkinId);
-        if ((count ?? 0) === 0) {
-          await supabase.from("mensajes").insert(
-            transcripcion.map((t, i) => ({
-              checkin_id: checkinId,
-              rol: t.rol,
-              contenido: t.texto,
-              orden: i,
-            })),
-          );
-        }
+          .select("orden")
+          .eq("checkin_id", checkinId)
+          .order("orden", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const base = (ultimo?.orden ?? -1) + 1;
+        await supabase.from("mensajes").insert(
+          transcripcion.map((t, i) => ({
+            checkin_id: checkinId,
+            rol: t.rol,
+            contenido: t.texto,
+            orden: base + i,
+          })),
+        );
       }
     }
 
