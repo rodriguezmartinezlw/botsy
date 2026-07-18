@@ -34,10 +34,15 @@ export function modeloRealtime(): string {
   return m && m.trim().length > 0 ? m : "gpt-realtime-2.1-mini";
 }
 
-/** Voz TTS del asistente (timbre). El idioma lo fijan las instrucciones (es-ES). */
+/**
+ * Voz TTS del asistente (timbre). El idioma lo fijan las instrucciones (es-ES).
+ * Por defecto `marin`: una de las dos voces NUEVAS y naturales de gpt-realtime
+ * (junto con `cedar`), mucho menos robótica que las clásicas (alloy/echo…)
+ * (feedback 2026-07-18). Configurable con `OPENAI_REALTIME_VOICE`.
+ */
 export function vozRealtime(): string {
   const v = process.env.OPENAI_REALTIME_VOICE;
-  return v && v.trim().length > 0 ? v : "alloy";
+  return v && v.trim().length > 0 ? v : "marin";
 }
 
 export type ToolRealtime = {

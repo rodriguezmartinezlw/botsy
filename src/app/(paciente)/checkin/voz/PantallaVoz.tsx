@@ -147,12 +147,17 @@ export default function PantallaVoz({
   const parcialPacienteRef = useRef("");
   const parcialAsistenteRef = useRef("");
   const cerrandoRef = useRef(false);
+  // Auto-colgado (WP-25): cuando el modelo llama a la tool de cierre, marca esto;
+  // tras su despedida (silencio del asistente unos segundos) se cuelga solo.
+  const finalizarPendienteRef = useRef(false);
+  const colgadoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Libera micrófono/sesión/grabadora al desmontar (sin finalizar el check-in).
   useEffect(() => {
     return () => {
       if (avisoTimerRef.current) clearTimeout(avisoTimerRef.current);
       if (corteTimerRef.current) clearTimeout(corteTimerRef.current);
+      if (colgadoTimerRef.current) clearTimeout(colgadoTimerRef.current);
       try {
         grabadoraRef.current?.stop();
       } catch {
@@ -167,8 +172,10 @@ export default function PantallaVoz({
   function limpiarTimers() {
     if (avisoTimerRef.current) clearTimeout(avisoTimerRef.current);
     if (corteTimerRef.current) clearTimeout(corteTimerRef.current);
+    if (colgadoTimerRef.current) clearTimeout(colgadoTimerRef.current);
     avisoTimerRef.current = null;
     corteTimerRef.current = null;
+    colgadoTimerRef.current = null;
   }
 
   function detenerStream() {
@@ -249,6 +256,7 @@ export default function PantallaVoz({
     setAvisoFin(false);
     setSubtitulos([]);
     transcripcionRef.current = [];
+    finalizarPendienteRef.current = false;
 
     // 0. Comprobación PREVIA del micrófono (sin disparar el prompt): navegador
     //    incompatible, contexto no seguro o permiso ya bloqueado → instrucciones
@@ -360,7 +368,25 @@ export default function PantallaVoz({
       modelo: datos.modelo,
       micStream: stream,
       manejadores: {
-        onEstado: (e) => setEstado(e),
+        onEstado: (e) => {
+          setEstado(e);
+          // Auto-colgado tras la despedida: si el cierre está pendiente y el
+          // asistente deja de hablar ("escuchando"), se cuelga tras una breve
+          // pausa. Si vuelve a hablar (sigue despidiéndose), se cancela y se
+          // reprograma → nunca corta a media frase.
+          if (!finalizarPendienteRef.current) return;
+          if (e === "hablando") {
+            if (colgadoTimerRef.current) {
+              clearTimeout(colgadoTimerRef.current);
+              colgadoTimerRef.current = null;
+            }
+          } else if (e === "escuchando") {
+            if (colgadoTimerRef.current) clearTimeout(colgadoTimerRef.current);
+            colgadoTimerRef.current = setTimeout(() => {
+              void terminar();
+            }, 3500);
+          }
+        },
         onTranscripcion: (t) => {
           if (t.rol === "paciente") {
             if (t.final) {
@@ -404,6 +430,9 @@ export default function PantallaVoz({
             const data = (await res.json()) as RespuestaTool;
             setDominios(data.dominiosCubiertos);
             setRiesgo(data.riesgo);
+            // El modelo ha decidido cerrar: deja que se despida y cuelga solo
+            // (la lógica del temporizador está en onEstado).
+            if (data.finalizar) finalizarPendienteRef.current = true;
             return { callId: tc.callId, output: data.output };
           } catch {
             return { callId: tc.callId, output: "ERROR: sin conexión." };

@@ -127,22 +127,26 @@ export function crearSesionOpenAIRealtime(
       return;
     }
 
-    // --- Transcripción del ASISTENTE (audio de salida) ---
-    if (tipo.includes("output_audio_transcript") || tipo.includes("audio_transcript")) {
-      const parcial = tipo.endsWith(".delta");
-      const texto = parcial ? (evento.delta ?? "") : (evento.transcript ?? evento.text ?? "");
-      if (texto) {
-        manejadores.onTranscripcion?.({ rol: "asistente", texto, final: !parcial });
-      }
-      return;
-    }
-
     // --- Transcripción del PACIENTE (audio de entrada) ---
+    // OJO al ORDEN: se comprueba ANTES que la del asistente porque
+    // "input_audio_transcription" CONTIENE la subcadena "audio_transcript", y si
+    // la rama del asistente fuera primero capturaría también los turnos del
+    // paciente → todo el diálogo quedaba etiquetado como "asistente" (bug 07-18).
     if (tipo.includes("input_audio_transcription")) {
       const parcial = tipo.endsWith(".delta");
       const texto = parcial ? (evento.delta ?? "") : (evento.transcript ?? "");
       if (texto) {
         manejadores.onTranscripcion?.({ rol: "paciente", texto, final: !parcial });
+      }
+      return;
+    }
+
+    // --- Transcripción del ASISTENTE (audio de salida) ---
+    if (tipo.includes("output_audio_transcript")) {
+      const parcial = tipo.endsWith(".delta");
+      const texto = parcial ? (evento.delta ?? "") : (evento.transcript ?? evento.text ?? "");
+      if (texto) {
+        manejadores.onTranscripcion?.({ rol: "asistente", texto, final: !parcial });
       }
       return;
     }
