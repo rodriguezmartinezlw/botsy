@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 import { es } from "date-fns/locale";
 import {
   ChevronDown,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import { crearClienteServidor } from "@/lib/supabase/server";
+import { fechaHoyEnZona } from "@/lib/ia/conversacion";
 import type {
   CanalCheckin,
   EstadoCheckin,
@@ -26,6 +27,7 @@ const POR_PAGINA = 10;
 type SesionHistorial = {
   id: string;
   fecha: string;
+  hora: string;
   tipo: TipoCheckin;
   canal: CanalCheckin | null;
   estado: EstadoCheckin;
@@ -38,17 +40,23 @@ type DatosHistorial = {
   sesiones: SesionHistorial[];
   pagina: number;
   totalPaginas: number;
+  hoy: string;
 };
 
 /**
- * Historial de la paciente (WP-24 §C.3): lista cronológica de check-ins y
- * consultas, paginada. La RLS `checkins_select_propio` / `mensajes_select_propio`
- * (0002) hace trivial la lectura: el cliente de servidor con su sesión solo ve
- * SUS filas (mismo patrón que la línea temporal del panel, versión paciente).
- * Nunca lanza: ante fallo devuelve vacío y la UI muestra un estado amable.
+ * Historial de la paciente (WP-24 §C.3 + rediseño 2026-07-18): lista cronológica
+ * de check-ins y consultas, AGRUPADA por día (Hoy / Ayer / fecha), paginada. La
+ * RLS `checkins_select_propio` / `mensajes_select_propio` (0002) hace trivial la
+ * lectura: el cliente de servidor con su sesión solo ve SUS filas. Nunca lanza:
+ * ante fallo devuelve vacío y la UI muestra un estado amable.
  */
 async function cargarHistorial(pagina: number): Promise<DatosHistorial> {
-  const vacio: DatosHistorial = { sesiones: [], pagina: 1, totalPaginas: 1 };
+  const vacio: DatosHistorial = {
+    sesiones: [],
+    pagina: 1,
+    totalPaginas: 1,
+    hoy: "",
+  };
   try {
     const supabase = await crearClienteServidor();
     const {
@@ -56,11 +64,16 @@ async function cargarHistorial(pagina: number): Promise<DatosHistorial> {
     } = await supabase.auth.getUser();
     if (!user) return vacio;
 
+    const { data: perfil } = await supabase
+      .from("perfiles")
+      .select("zona_horaria")
+      .eq("id", user.id)
+      .maybeSingle();
+    const zona = perfil?.zona_horaria ?? "Europe/Madrid";
+    const hoy = fechaHoyEnZona(zona);
+
     const desde = (pagina - 1) * POR_PAGINA;
-    const {
-      data: checkins,
-      count,
-    } = await supabase
+    const { data: checkins, count } = await supabase
       .from("checkins")
       .select("id, fecha, tipo, canal, estado, riesgo, resumen, creado_en", {
         count: "exact",
@@ -72,7 +85,7 @@ async function cargarHistorial(pagina: number): Promise<DatosHistorial> {
 
     const totalPaginas = Math.max(1, Math.ceil((count ?? 0) / POR_PAGINA));
     if (!checkins || checkins.length === 0) {
-      return { sesiones: [], pagina, totalPaginas };
+      return { sesiones: [], pagina, totalPaginas, hoy };
     }
 
     // Transcripts de la página actual (RLS: solo los propios).
@@ -93,6 +106,7 @@ async function cargarHistorial(pagina: number): Promise<DatosHistorial> {
       sesiones: checkins.map((c) => ({
         id: c.id,
         fecha: c.fecha,
+        hora: horaLegible(c.creado_en),
         tipo: c.tipo,
         canal: c.canal,
         estado: c.estado,
@@ -102,18 +116,53 @@ async function cargarHistorial(pagina: number): Promise<DatosHistorial> {
       })),
       pagina,
       totalPaginas,
+      hoy,
     };
   } catch {
     return vacio;
   }
 }
 
-function fechaLegible(fecha: string): string {
+function horaLegible(creadoEn: string | null): string {
+  if (!creadoEn) return "";
   try {
-    return format(parseISO(fecha), "EEEE d 'de' MMMM yyyy", { locale: es });
+    return format(parseISO(creadoEn), "HH:mm");
+  } catch {
+    return "";
+  }
+}
+
+/** Encabezado amable de cada grupo diario: "Hoy", "Ayer" o la fecha completa. */
+function etiquetaDia(fecha: string, hoy: string): string {
+  if (hoy && fecha === hoy) return "Hoy";
+  try {
+    if (hoy && fecha === format(subDays(parseISO(hoy), 1), "yyyy-MM-dd")) {
+      return "Ayer";
+    }
+    return format(parseISO(fecha), "EEEE d 'de' MMMM", { locale: es });
   } catch {
     return fecha;
   }
+}
+
+type GrupoDia = { fecha: string; etiqueta: string; sesiones: SesionHistorial[] };
+
+/** Agrupa la lista (ya ordenada por fecha desc) en bloques por día. */
+function agruparPorDia(sesiones: SesionHistorial[], hoy: string): GrupoDia[] {
+  const grupos: GrupoDia[] = [];
+  for (const s of sesiones) {
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo && ultimo.fecha === s.fecha) {
+      ultimo.sesiones.push(s);
+    } else {
+      grupos.push({
+        fecha: s.fecha,
+        etiqueta: etiquetaDia(s.fecha, hoy),
+        sesiones: [s],
+      });
+    }
+  }
+  return grupos;
 }
 
 /** Badge de riesgo: misma paleta calmada que el chat (señal, no diagnóstico). */
@@ -140,44 +189,51 @@ function BadgeRiesgo({ nivel }: { nivel: NivelRiesgo }) {
 
 function TarjetaSesion({ sesion }: { sesion: SesionHistorial }) {
   const esConsulta = sesion.tipo === "consulta";
+  const esVoz = sesion.canal === "voz";
+  // Acento por tipo (calmado): consulta = azul de marca, check-in = verde salud.
+  const acento = esConsulta ? "var(--color-primario)" : "var(--color-acento-fuerte)";
+  const titulo = esConsulta ? "Consulta" : "Check-in diario";
+  const Canal = esVoz ? Mic : MessagesSquare;
+
   return (
-    <details className="group rounded-[var(--radius-lg)] border border-borde bg-superficie">
+    <details
+      className="group overflow-hidden rounded-[var(--radius-lg)] border border-borde bg-superficie"
+      style={{ borderLeftWidth: "4px", borderLeftColor: acento }}
+    >
       <summary className="flex min-h-11 cursor-pointer list-none flex-col gap-2 p-5 [&::-webkit-details-marker]:hidden">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-3">
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-sm font-semibold ${
-              esConsulta
-                ? "bg-primario-suave text-primario"
-                : "bg-acento-suave text-acento-fuerte"
-            }`}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{ backgroundColor: "var(--color-superficie-suave)", color: acento }}
           >
-            {esConsulta ? "Conversación" : "Check-in"}
+            <Canal className="h-5 w-5" aria-hidden />
           </span>
-          {sesion.canal && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-superficie-suave px-3 py-1 text-sm font-medium text-texto-suave">
-              {sesion.canal === "voz" ? (
-                <Mic className="h-4 w-4" aria-hidden />
-              ) : (
-                <MessagesSquare className="h-4 w-4" aria-hidden />
-              )}
-              {sesion.canal === "voz" ? "Voz" : "Texto"}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <span className="text-base font-semibold text-texto">{titulo}</span>
+            <span className="text-sm text-texto-suave">
+              {esVoz ? "Por voz" : "Por escrito"}
+              {sesion.hora ? ` · ${sesion.hora}` : ""}
             </span>
-          )}
-          {sesion.estado === "en_curso" && (
-            <span className="inline-flex items-center rounded-full bg-superficie-suave px-3 py-1 text-sm font-medium text-texto-tenue">
-              Sin terminar
-            </span>
-          )}
-          {sesion.riesgo && <BadgeRiesgo nivel={sesion.riesgo} />}
+          </div>
         </div>
-        <p className="text-base font-semibold capitalize text-texto">
-          {fechaLegible(sesion.fecha)}
-        </p>
+
+        {(sesion.estado === "en_curso" || sesion.riesgo) && (
+          <div className="flex flex-wrap items-center gap-2">
+            {sesion.estado === "en_curso" && (
+              <span className="inline-flex items-center rounded-full bg-superficie-suave px-3 py-1 text-sm font-medium text-texto-tenue">
+                Sin terminar
+              </span>
+            )}
+            {sesion.riesgo && <BadgeRiesgo nivel={sesion.riesgo} />}
+          </div>
+        )}
+
         {sesion.resumen && (
           <p className="text-base leading-relaxed text-texto-suave">
             {sesion.resumen}
           </p>
         )}
+
         <span className="flex items-center gap-1 text-base font-semibold text-primario">
           <ChevronDown
             className="h-5 w-5 transition-transform group-open:rotate-180"
@@ -187,31 +243,35 @@ function TarjetaSesion({ sesion }: { sesion: SesionHistorial }) {
           <span className="hidden group-open:inline">Ocultar la conversación</span>
         </span>
       </summary>
-      <div className="flex flex-col gap-3 border-t border-borde p-5">
+
+      <div className="flex flex-col gap-4 border-t border-borde p-5">
         {sesion.mensajes.length === 0 ? (
           <p className="text-base text-texto-tenue">
             No hay mensajes guardados de esta conversación.
           </p>
         ) : (
-          sesion.mensajes.map((m, i) => (
-            <div
-              key={i}
-              className={`flex ${m.rol === "asistente" ? "justify-start" : "justify-end"}`}
-            >
+          sesion.mensajes.map((m, i) => {
+            const esBotsy = m.rol === "asistente";
+            return (
               <div
-                className={`max-w-[85%] whitespace-pre-wrap rounded-[var(--radius-lg)] px-4 py-3 text-base leading-relaxed ${
-                  m.rol === "asistente"
-                    ? "bg-superficie-suave text-texto"
-                    : "bg-primario text-white"
-                }`}
+                key={i}
+                className={`flex flex-col gap-1 ${esBotsy ? "items-start" : "items-end"}`}
               >
-                <span className="sr-only">
-                  {m.rol === "asistente" ? "Botsy: " : "Tú: "}
+                <span className="px-1 text-sm font-semibold text-texto-tenue">
+                  {esBotsy ? "Botsy" : "Tú"}
                 </span>
-                {m.contenido}
+                <div
+                  className={`max-w-[85%] whitespace-pre-wrap rounded-[var(--radius-lg)] px-4 py-3 text-base leading-relaxed ${
+                    esBotsy
+                      ? "bg-superficie-suave text-texto"
+                      : "bg-primario text-white"
+                  }`}
+                >
+                  {m.contenido}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </details>
@@ -228,13 +288,14 @@ export default async function HistorialPage({
   const pagina =
     Number.isFinite(paginaPedida) && paginaPedida >= 1 ? paginaPedida : 1;
 
-  const { sesiones, totalPaginas } = await cargarHistorial(pagina);
+  const { sesiones, totalPaginas, hoy } = await cargarHistorial(pagina);
+  const grupos = agruparPorDia(sesiones, hoy);
 
   return (
     <div className="flex flex-col gap-6">
       <EncabezadoPagina
         titulo="Tu historial"
-        descripcion="Aquí están tus check-ins y conversaciones con Botsy, de la más reciente a la más antigua."
+        descripcion="Tus check-ins y conversaciones con Botsy, de lo más reciente a lo más antiguo."
         icono={<History className="h-6 w-6" aria-hidden />}
       />
 
@@ -253,11 +314,20 @@ export default async function HistorialPage({
         </div>
       ) : (
         <>
-          <section aria-label="Conversaciones" className="flex flex-col gap-4">
-            {sesiones.map((s) => (
-              <TarjetaSesion key={s.id} sesion={s} />
-            ))}
-          </section>
+          {grupos.map((grupo) => (
+            <section
+              key={grupo.fecha}
+              aria-label={grupo.etiqueta}
+              className="flex flex-col gap-3"
+            >
+              <h2 className="text-lg font-bold capitalize text-texto">
+                {grupo.etiqueta}
+              </h2>
+              {grupo.sesiones.map((s) => (
+                <TarjetaSesion key={s.id} sesion={s} />
+              ))}
+            </section>
+          ))}
 
           {/* Paginación (targets grandes, perfil geriátrico) */}
           {totalPaginas > 1 && (

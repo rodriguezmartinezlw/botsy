@@ -1,14 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ShieldCheck } from "lucide-react";
-import CabeceraPerfil from "@/components/paciente/perfil/CabeceraPerfil";
-import PanelPerfil from "@/components/paciente/perfil/PanelPerfil";
+import { ShieldCheck, TrendingUp } from "lucide-react";
 import FormularioMisDatos from "@/components/paciente/perfil/FormularioMisDatos";
 import BotonCerrarSesion from "@/components/paciente/perfil/BotonCerrarSesion";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { horaDesdeColumna } from "@/lib/perfil/datos-perfil";
 import { esZonaHorariaValida } from "@/lib/perfil/zonas";
-import { cargarDatosPerfil } from "./datos";
 
 export const metadata: Metadata = {
   title: "Perfil",
@@ -19,6 +16,7 @@ type DatosEditables = {
   telefono: string;
   hora: string;
   zona: string;
+  avatarUrl: string | null;
 };
 
 /**
@@ -32,6 +30,7 @@ async function cargarDatosEditables(): Promise<DatosEditables> {
     telefono: "",
     hora: "10:00",
     zona: "America/Lima",
+    avatarUrl: null,
   };
   try {
     const supabase = await crearClienteServidor();
@@ -42,7 +41,7 @@ async function cargarDatosEditables(): Promise<DatosEditables> {
 
     const { data: perfil } = await supabase
       .from("perfiles")
-      .select("nombre, telefono, zona_horaria")
+      .select("nombre, telefono, zona_horaria, avatar_url")
       .eq("id", user.id)
       .maybeSingle();
     const { data: paciente } = await supabase
@@ -57,30 +56,54 @@ async function cargarDatosEditables(): Promise<DatosEditables> {
       telefono: perfil?.telefono ?? "",
       hora: horaDesdeColumna(paciente?.hora_checkin),
       zona: esZonaHorariaValida(zona) ? zona : "America/Lima",
+      avatarUrl: perfil?.avatar_url ?? null,
     };
   } catch {
     return porDefecto;
   }
 }
 
+function inicialDe(nombre: string): string {
+  const limpio = nombre.trim();
+  return limpio.length > 0 ? limpio[0].toUpperCase() : "?";
+}
+
 /**
- * Perfil evolutivo del paciente (WP-05) + cuenta editable (WP-20 §C).
- *
- * Server Component: carga y AGREGA los datos en el servidor (RLS 'propio' de
- * WP-01) y pasa las series YA CALCULADAS a los componentes cliente de gráfico.
- * Añade la sección "Mis datos" (editable), el acceso a "Mis consentimientos" y el
- * cierre de sesión. No hay contenido que diagnostique.
+ * Perfil del paciente (WP-05 + WP-20 §C), reenfocado (feedback 2026-07-18):
+ * solo IDENTIDAD y AJUSTES. La evolución clínica (gráficos, racha, síntomas) se
+ * trasladó a Inicio; aquí quedan los datos personales editables, los
+ * consentimientos y el cierre de sesión. No hay contenido que diagnostique.
  */
 export default async function PerfilPage() {
-  const [datos, editables] = await Promise.all([
-    cargarDatosPerfil(),
-    cargarDatosEditables(),
-  ]);
+  const editables = await cargarDatosEditables();
+  const nombreMostrado =
+    editables.nombre.trim().length > 0 ? editables.nombre : "Tu perfil";
 
   return (
     <div className="flex flex-col gap-6">
-      <CabeceraPerfil cabecera={datos.cabecera} />
-      <PanelPerfil datos={datos} />
+      <header className="flex items-center gap-4">
+        {editables.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={editables.avatarUrl}
+            alt=""
+            className="h-16 w-16 rounded-full object-cover"
+          />
+        ) : (
+          <span
+            aria-hidden
+            className="flex h-16 w-16 items-center justify-center rounded-full bg-primario-suave text-2xl font-bold text-primario"
+          >
+            {inicialDe(editables.nombre)}
+          </span>
+        )}
+        <div className="flex flex-col">
+          <h1 className="text-2xl font-bold tracking-tight text-texto">
+            {nombreMostrado}
+          </h1>
+          <p className="text-base text-texto-suave">Tus datos y ajustes</p>
+        </div>
+      </header>
 
       <FormularioMisDatos
         nombreInicial={editables.nombre}
@@ -88,6 +111,19 @@ export default async function PerfilPage() {
         horaInicial={editables.hora}
         zonaInicial={editables.zona}
       />
+
+      <Link
+        href="/inicio"
+        className="flex h-12 items-center justify-between gap-2 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave px-5 text-base font-semibold text-texto transition-colors hover:bg-superficie"
+      >
+        <span className="inline-flex items-center gap-2">
+          <TrendingUp className="h-5 w-5 text-primario" aria-hidden />
+          Ver mi evolución
+        </span>
+        <span className="text-texto-tenue" aria-hidden>
+          →
+        </span>
+      </Link>
 
       <section
         aria-label="Ajustes de cuenta"
@@ -107,8 +143,7 @@ export default async function PerfilPage() {
       </section>
 
       <p className="text-sm text-texto-tenue">
-        Esto refleja lo que registras en tus check-ins. Botsy no diagnostica ni
-        sustituye a tu médico.
+        Botsy no diagnostica ni sustituye a tu médico.
       </p>
     </div>
   );

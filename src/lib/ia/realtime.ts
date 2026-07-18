@@ -16,6 +16,16 @@
 
 import { z } from "zod";
 
+/**
+ * "Ansiedad" del detector de turnos semántico (cuánto espera antes de responder).
+ * Por defecto `low`: la paciente puede pausar sin que Botsy la interrumpa.
+ * Configurable con `OPENAI_REALTIME_EAGERNESS` (low|medium|high|auto).
+ */
+export function procesoEagerness(): "low" | "medium" | "high" | "auto" {
+  const v = (process.env.OPENAI_REALTIME_EAGERNESS ?? "low").trim();
+  return v === "medium" || v === "high" || v === "auto" ? v : "low";
+}
+
 /** Lee el modelo Realtime de entorno (configurable, nunca hardcodeado). */
 export function modeloRealtime(): string {
   const m = process.env.OPENAI_REALTIME_MODEL;
@@ -90,7 +100,15 @@ export async function crearSesionRealtime(
       audio: {
         input: {
           transcription: { model: "gpt-4o-mini-transcribe" },
-          turn_detection: { type: "server_vad" },
+          // Detección de turno SEMÁNTICA (WP-25): en vez de cortar por silencio
+          // (server_vad), un clasificador decide cuándo la persona ha TERMINADO de
+          // hablar por lo que dice → menos cortes con pacientes que hacen pausas.
+          // `eagerness: 'low'` = espera más antes de responder (población mayor,
+          // en tratamiento, que habla despacio). Configurable por env.
+          turn_detection: {
+            type: "semantic_vad",
+            eagerness: procesoEagerness(),
+          },
         },
         output: { voice: voz },
       },

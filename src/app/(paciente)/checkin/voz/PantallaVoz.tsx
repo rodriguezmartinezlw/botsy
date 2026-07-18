@@ -140,6 +140,10 @@ export default function PantallaVoz({
   const maxMinutosRef = useRef(8);
   const avisoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const corteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Transcript COMPLETO de la sesión (los subtítulos solo guardan las últimas
+  // líneas): se persiste al cerrar para que la conversación de voz tenga
+  // historial y el profesional pueda leerla (WP-25; antes se perdía).
+  const transcripcionRef = useRef<{ rol: "paciente" | "asistente"; texto: string }[]>([]);
   const parcialPacienteRef = useRef("");
   const parcialAsistenteRef = useRef("");
   const cerrandoRef = useRef(false);
@@ -220,6 +224,14 @@ export default function PantallaVoz({
   }
 
   function empujarTranscripcion(rol: "paciente" | "asistente", texto: string) {
+    // Acumula el transcript completo (para persistirlo al cerrar) y muestra solo
+    // las últimas líneas como subtítulos.
+    const ult = transcripcionRef.current[transcripcionRef.current.length - 1];
+    if (ult && ult.rol === rol) {
+      ult.texto = `${ult.texto} ${texto}`.trim(); // une fragmentos del mismo turno
+    } else {
+      transcripcionRef.current.push({ rol, texto });
+    }
     setSubtitulos((prev) => {
       const siguiente = [...prev, { rol, texto }];
       return siguiente.slice(-8); // mantén las últimas líneas visibles
@@ -236,6 +248,7 @@ export default function PantallaVoz({
     setReintentable(true);
     setAvisoFin(false);
     setSubtitulos([]);
+    transcripcionRef.current = [];
 
     // 0. Comprobación PREVIA del micrófono (sin disparar el prompt): navegador
     //    incompatible, contexto no seguro o permiso ya bloqueado → instrucciones
@@ -478,7 +491,12 @@ export default function PantallaVoz({
       const res = await fetch("/api/voz/finalizar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(audioPath ? { checkinId, audioPath } : { checkinId }),
+        body: JSON.stringify({
+          checkinId,
+          ...(audioPath ? { audioPath } : {}),
+          // Transcript completo de la conversación de voz → se guarda en `mensajes`.
+          transcripcion: transcripcionRef.current,
+        }),
       });
       if (!res.ok) {
         if (res.status === 401) {

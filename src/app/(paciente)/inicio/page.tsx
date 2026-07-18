@@ -1,8 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Flame, Home, MessagesSquare, Mic, UserRoundSearch } from "lucide-react";
+import { Flame, Home, MessagesSquare, Mic, TrendingUp, UserRoundSearch } from "lucide-react";
 import EncabezadoPagina from "@/components/ui/EncabezadoPagina";
 import InterstitialConsentimiento from "@/components/paciente/InterstitialConsentimiento";
+import EstadoCheckinHoy from "@/components/paciente/EstadoCheckinHoy";
+import PanelPerfil from "@/components/paciente/perfil/PanelPerfil";
 import { crearClienteServidor } from "@/lib/supabase/server";
 import { fechaHoyEnZona } from "@/lib/ia/conversacion";
 import {
@@ -11,12 +13,12 @@ import {
   type FilaConsentimiento,
 } from "@/lib/consentimientos/estado";
 import type { EstadoCheckin } from "@/types/db";
+import { cargarDatosPerfil } from "../perfil/datos";
 
 export const metadata: Metadata = { title: "Inicio" };
 
 type EstadoInicio = {
   nombre: string;
-  rachaActual: number;
   estadoCheckinHoy: EstadoCheckin | null;
   puedeConversar: boolean;
   vinculado: boolean;
@@ -26,7 +28,6 @@ type EstadoInicio = {
 async function cargarEstado(): Promise<EstadoInicio> {
   const porDefecto: EstadoInicio = {
     nombre: "",
-    rachaActual: 0,
     estadoCheckinHoy: null,
     puedeConversar: false,
     vinculado: true,
@@ -47,7 +48,7 @@ async function cargarEstado(): Promise<EstadoInicio> {
 
     const { data: paciente } = await supabase
       .from("pacientes")
-      .select("racha_actual, profesional_id, institucion_id")
+      .select("profesional_id, institucion_id")
       .eq("id", user.id)
       .maybeSingle();
 
@@ -72,7 +73,6 @@ async function cargarEstado(): Promise<EstadoInicio> {
 
     return {
       nombre: perfil?.nombre ?? "",
-      rachaActual: paciente?.racha_actual ?? 0,
       estadoCheckinHoy: checkin?.estado ?? null,
       puedeConversar: puedeConversar(consent),
       // Si no hay fila de paciente todavía, no mostramos el aviso (evita falsos
@@ -96,14 +96,21 @@ function primerNombre(nombre: string): string {
 }
 
 export default async function InicioPage() {
+  // Inicio es el HUB (feedback 2026-07-18): además de la conversación diaria,
+  // muestra la EVOLUCIÓN clínica que antes vivía en Perfil (Perfil se queda solo
+  // con los datos personales editables y los ajustes de cuenta).
+  const [estado, datos] = await Promise.all([
+    cargarEstado(),
+    cargarDatosPerfil(),
+  ]);
   const {
     nombre,
-    rachaActual,
     estadoCheckinHoy,
     puedeConversar: puede,
     vinculado,
     email,
-  } = await cargarEstado();
+  } = estado;
+  const { rachaActual, checkinsMes } = datos.cabecera;
   const saludoNombre = primerNombre(nombre);
   const completado = estadoCheckinHoy === "completado";
   const enCurso = estadoCheckinHoy === "en_curso";
@@ -156,69 +163,82 @@ export default async function InicioPage() {
         </section>
       )}
 
-      {rachaActual > 0 && (
-        <section
-          aria-label="Tu racha"
-          className="flex items-center gap-3 rounded-[var(--radius-lg)] border border-borde bg-primario-suave p-5"
-        >
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-superficie text-primario">
-            <Flame className="h-6 w-6" aria-hidden />
-          </span>
-          <div>
-            <p className="text-lg font-bold text-texto">
-              {rachaActual} {rachaActual === 1 ? "día" : "días"} seguidos
-            </p>
-            <p className="text-sm text-texto-suave">
-              Cada día que registras cuenta.
-            </p>
-          </div>
-        </section>
-      )}
-
       {!puede ? (
         <InterstitialConsentimiento />
       ) : (
-      <section
-        aria-label="Check-in de hoy"
-        className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6"
-      >
-        <p className="text-base text-texto-suave">{textoEstado}</p>
-        {completado && (
-          <p className="text-base font-medium text-texto">
-            Cuéntame lo que necesites, a cualquier hora.
-          </p>
-        )}
-        <div className="flex flex-col gap-3">
-          {/* WP-24: micrófono accesible desde inicio, SIEMPRE. */}
-          <Link
-            href={hrefVoz}
-            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
+        <>
+          <section
+            aria-label="Check-in de hoy"
+            className="flex flex-col gap-4 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave p-6"
           >
-            <Mic className="h-5 w-5" aria-hidden />
-            Hablar con Botsy
-          </Link>
-          <Link
-            href={hrefTexto}
-            className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-lg font-semibold text-primario transition-colors hover:bg-primario-suave"
-          >
-            <MessagesSquare className="h-5 w-5" aria-hidden />
-            {enCurso ? "Continuar por escrito" : "Escribir"}
-          </Link>
-          {completado && (
-            <Link
-              href="/checkin"
-              className="flex min-h-11 items-center justify-center px-4 py-2 text-base font-semibold text-primario underline-offset-4 hover:underline"
-            >
-              Ver mi check-in de hoy
-            </Link>
-          )}
-        </div>
-      </section>
+            <p className="text-base text-texto-suave">{textoEstado}</p>
+            {completado && (
+              <p className="text-base font-medium text-texto">
+                Cuéntame lo que necesites, a cualquier hora.
+              </p>
+            )}
+            <div className="flex flex-col gap-3">
+              {/* WP-24: micrófono accesible desde inicio, SIEMPRE. */}
+              <Link
+                href={hrefVoz}
+                className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-lg font-semibold text-white transition-colors hover:bg-primario-fuerte"
+              >
+                <Mic className="h-5 w-5" aria-hidden />
+                Hablar con Botsy
+              </Link>
+              <Link
+                href={hrefTexto}
+                className="flex h-14 items-center justify-center gap-2 rounded-[var(--radius-lg)] border-2 border-primario bg-superficie px-6 text-lg font-semibold text-primario transition-colors hover:bg-primario-suave"
+              >
+                <MessagesSquare className="h-5 w-5" aria-hidden />
+                {enCurso ? "Continuar por escrito" : "Escribir"}
+              </Link>
+              {completado && (
+                <Link
+                  href="/checkin"
+                  className="flex min-h-11 items-center justify-center px-4 py-2 text-base font-semibold text-primario underline-offset-4 hover:underline"
+                >
+                  Ver mi check-in de hoy
+                </Link>
+              )}
+            </div>
+          </section>
+
+          {/* Evolución clínica (antes en Perfil). Cabecera de racha + panel. */}
+          <section aria-label="Tu evolución" className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-5 w-5 text-primario" aria-hidden />
+              <h2 className="text-xl font-bold text-texto">Tu evolución</h2>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <div className="flex items-center gap-2.5 rounded-[var(--radius-lg)] border border-borde bg-primario-suave px-4 py-3">
+                <Flame className="h-6 w-6 text-primario" aria-hidden />
+                <span className="text-base font-semibold text-texto">
+                  {rachaActual} {rachaActual === 1 ? "día" : "días"} de racha
+                </span>
+              </div>
+              <div className="flex items-center gap-2.5 rounded-[var(--radius-lg)] border border-borde bg-superficie-suave px-4 py-3">
+                <span className="text-base text-texto-suave">
+                  Check-ins este mes:
+                </span>
+                <span className="text-base font-semibold text-texto">
+                  {checkinsMes}
+                </span>
+              </div>
+            </div>
+
+            <PanelPerfil datos={datos} />
+          </section>
+        </>
       )}
 
       <p className="text-sm text-texto-tenue">
         Botsy no diagnostica ni sustituye a tu médico.
       </p>
+
+      {/* Estado del check-in de hoy, bajo el aviso legal (feedback 2026-07-18). */}
+      {puede && <EstadoCheckinHoy estado={estadoCheckinHoy} />}
     </div>
   );
 }

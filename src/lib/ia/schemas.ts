@@ -218,10 +218,20 @@ export const esquemaCuerpoToolVoz = z
   .strict();
 
 /** Cuerpo de `POST /api/voz/finalizar`: como el de texto + ruta de audio opcional. */
+/** Un turno del transcript de voz (WP-25): se persiste en `mensajes`. */
+export const esquemaTurnoVoz = z
+  .object({
+    rol: z.enum(["paciente", "asistente"]),
+    texto: z.string().trim().min(1).max(4000),
+  })
+  .strict();
+
 export const esquemaCuerpoFinalizarVoz = z
   .object({
     checkinId: z.string().uuid(),
     audioPath: z.string().min(1).max(400).optional(),
+    /** Transcript completo de la sesión de voz (opcional; puede venir vacío). */
+    transcripcion: z.array(esquemaTurnoVoz).max(400).optional(),
   })
   .strict();
 
