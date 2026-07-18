@@ -17,6 +17,10 @@ import type { NivelRiesgo, TipoCheckin, VerticalPaciente } from "@/types/db";
 import { DOMINIOS_CHECKIN, type DominioCheckin } from "@/lib/ia/dominios";
 import { crearClienteNavegador } from "@/lib/supabase/client";
 import {
+  comprobarSoporteMicrofono,
+  explicarErrorMicrofono,
+} from "@/lib/voz/diagnostico-microfono";
+import {
   crearSesionVoz,
   type EstadoVoz,
   type VoiceSession,
@@ -119,6 +123,8 @@ export default function PantallaVoz({
   const [avisoFin, setAvisoFin] = useState(false);
   const [grabando, setGrabando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pasosError, setPasosError] = useState<string[]>([]);
+  const [reintentable, setReintentable] = useState(true);
   const [cierre, setCierre] = useState<RespuestaFinalizar | null>(null);
 
   // Recursos vivos (no provocan re-render): sesión, medios, grabadora, timers.
@@ -226,8 +232,27 @@ export default function PantallaVoz({
       return;
     }
     setError(null);
+    setPasosError([]);
+    setReintentable(true);
     setAvisoFin(false);
     setSubtitulos([]);
+
+    // 0. Comprobación PREVIA del micrófono (sin disparar el prompt): navegador
+    //    incompatible, contexto no seguro o permiso ya bloqueado → instrucciones
+    //    claras ANTES de gastar una sesión (feedback móvil 2026-07-18).
+    const previo = await comprobarSoporteMicrofono({
+      mediaDevices: navigator.mediaDevices,
+      permissions: navigator.permissions as never,
+      esContextoSeguro: window.isSecureContext,
+    });
+    if (previo) {
+      setError(previo.titulo);
+      setPasosError(previo.pasos);
+      setReintentable(previo.reintentable);
+      setFase("fallo");
+      return;
+    }
+
     setFase("conectando");
     setEstado("conectando");
 
@@ -277,10 +302,11 @@ export default function PantallaVoz({
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError(
-        "No pude acceder al micrófono. Revisa los permisos del navegador o usa el chat de texto.",
-      );
+    } catch (e) {
+      const d = explicarErrorMicrofono(e);
+      setError(d.titulo);
+      setPasosError(d.pasos);
+      setReintentable(d.reintentable);
       setFase("fallo");
       return;
     }
@@ -582,6 +608,23 @@ export default function PantallaVoz({
         <p role="alert" className="text-base text-texto-suave">
           {error ?? "Algo no ha ido bien. Puedes usar el chat de texto."}
         </p>
+        {pasosError.length > 0 && (
+          <ol className="flex list-decimal flex-col gap-2 pl-5 text-base text-texto-suave">
+            {pasosError.map((p, i) => (
+              <li key={i}>{p}</li>
+            ))}
+          </ol>
+        )}
+        {reintentable && (
+          <button
+            type="button"
+            onClick={iniciar}
+            className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-base font-semibold text-white transition-colors hover:bg-primario-fuerte"
+          >
+            <Mic className="h-5 w-5" aria-hidden />
+            Reintentar
+          </button>
+        )}
         <Link
           href={hrefTexto}
           className="flex h-12 items-center justify-center gap-2 rounded-[var(--radius-lg)] bg-primario px-6 text-base font-semibold text-white transition-colors hover:bg-primario-fuerte"
