@@ -18,12 +18,14 @@ import { z } from "zod";
 
 /**
  * "Ansiedad" del detector de turnos semántico (cuánto espera antes de responder).
- * Por defecto `low`: la paciente puede pausar sin que Botsy la interrumpa.
- * Configurable con `OPENAI_REALTIME_EAGERNESS` (low|medium|high|auto).
+ * Por defecto `medium`: equilibrio entre no interrumpir al paciente y responder
+ * con agilidad. `low` esperaba demasiado y la conversación "se quedaba" entre
+ * turnos (feedback en teléfono, 2026-07-18). Configurable con
+ * `OPENAI_REALTIME_EAGERNESS` (low|medium|high|auto).
  */
 export function procesoEagerness(): "low" | "medium" | "high" | "auto" {
-  const v = (process.env.OPENAI_REALTIME_EAGERNESS ?? "low").trim();
-  return v === "medium" || v === "high" || v === "auto" ? v : "low";
+  const v = (process.env.OPENAI_REALTIME_EAGERNESS ?? "medium").trim();
+  return v === "low" || v === "high" || v === "auto" ? v : "medium";
 }
 
 /** Lee el modelo Realtime de entorno (configurable, nunca hardcodeado). */

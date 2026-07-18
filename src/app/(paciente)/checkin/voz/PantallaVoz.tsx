@@ -311,10 +311,19 @@ export default function PantallaVoz({
     };
     maxMinutosRef.current = datos.maxMinutos;
 
-    // 2. Micrófono (fallback claro si getUserMedia falla).
+    // 2. Micrófono (fallback claro si getUserMedia falla). Con cancelación de
+    //    eco/ruido: en móvil con ALTAVOZ, la voz de Botsy se colaba por el micro
+    //    y el detector de turnos la tomaba como que el paciente hablaba →
+    //    interrumpía a Botsy (barge-in) y la conversación "se quedaba" a medias.
     let stream: MediaStream;
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
     } catch (e) {
       const d = explicarErrorMicrofono(e);
       setError(d.titulo);

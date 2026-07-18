@@ -152,7 +152,11 @@ export function crearSesionOpenAIRealtime(
       emitirEstado("escuchando");
       return;
     }
-    if (tipo === "response.created" || tipo.startsWith("response.output_audio.")) {
+    if (
+      tipo === "response.created" ||
+      tipo === "output_audio_buffer.started" ||
+      tipo.startsWith("response.output_audio.")
+    ) {
       emitirEstado("hablando");
       return;
     }
@@ -180,7 +184,15 @@ export function crearSesionOpenAIRealtime(
       streamPropio = opciones.micStream ?? null;
       const stream =
         streamPropio ??
-        (await navigator.mediaDevices.getUserMedia({ audio: true }));
+        (await navigator.mediaDevices.getUserMedia({
+          // Cancelación de eco/ruido: evita que Botsy se oiga a sí mismo por el
+          // altavoz del móvil y se auto-interrumpa (barge-in falso).
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true,
+          },
+        }));
       if (!opciones.micStream) streamPropio = stream;
 
       // 2. Conexión par a par.
@@ -211,10 +223,11 @@ export function crearSesionOpenAIRealtime(
         if (!pc) return;
         if (pc.connectionState === "connected") {
           emitirEstado("escuchando");
-        } else if (
-          pc.connectionState === "failed" ||
-          pc.connectionState === "disconnected"
-        ) {
+        } else if (pc.connectionState === "failed") {
+          // Solo 'failed' es TERMINAL. 'disconnected' es transitorio (típico en
+          // móvil: cambio de celda, wifi↔datos) y ICE suele recuperarse solo a
+          // 'connected'; tratarlo como error cortaba conversaciones que iban a
+          // seguir. Por eso aquí solo se corta en 'failed'.
           if (!cerrada) {
             emitirError("Se perdió la conexión de voz.");
             emitirEstado("error");
