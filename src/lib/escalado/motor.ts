@@ -140,7 +140,9 @@ const esquemaCondCombinacion = z
   .strict();
 
 /** Valida y normaliza una `condicion` JSONB; `null` si es inválida. */
-export function parsearCondicion(valor: Json | null | undefined): Condicion | null {
+export function parsearCondicion(
+  valor: Json | null | undefined,
+): Condicion | null {
   if (valor === null || valor === undefined) return null;
   const r = esquemaCondicion.safeParse(valor);
   return r.success ? r.data : null;
@@ -252,7 +254,8 @@ function maxDiasConsecutivos(dias: { fecha: string; ok: boolean }[]): number {
   let prev: string | null = null;
   for (const d of orden) {
     if (d.ok) {
-      actual = prev !== null && diferenciaDias(prev, d.fecha) === 1 ? actual + 1 : 1;
+      actual =
+        prev !== null && diferenciaDias(prev, d.fecha) === 1 ? actual + 1 : 1;
       mejor = Math.max(mejor, actual);
     } else {
       actual = 0;
@@ -295,7 +298,9 @@ function evalObservacion(
     match: true,
     observaciones: matches,
     senales: [],
-    detalle: [`Observación ${cond.dominio}${cod}${rango ? ` (${rango})` : ""}.`],
+    detalle: [
+      `Observación ${cond.dominio}${cod}${rango ? ` (${rango})` : ""}.`,
+    ],
   };
 }
 
@@ -376,10 +381,16 @@ function evalInstrumento(
 ): EvaluacionCond {
   const matches = (datos.instrumentos ?? []).filter((r) => {
     if (r.instrumento !== cond.instrumento) return false;
-    if (cond.puntuacion_gte !== undefined && !(r.puntuacion >= cond.puntuacion_gte)) {
+    if (
+      cond.puntuacion_gte !== undefined &&
+      !(r.puntuacion >= cond.puntuacion_gte)
+    ) {
       return false;
     }
-    if (cond.puntuacion_lte !== undefined && !(r.puntuacion <= cond.puntuacion_lte)) {
+    if (
+      cond.puntuacion_lte !== undefined &&
+      !(r.puntuacion <= cond.puntuacion_lte)
+    ) {
       return false;
     }
     return true;
@@ -537,12 +548,15 @@ function extraerContextoSenal(detalle: Json | null): ContextoSenal | null {
   if (typeof tipo !== "string" || tipo.trim().length === 0) {
     return null;
   }
-  const descripcion = (evidencia as Record<string, Json | undefined>).descripcion;
-  const evidenciaTextual = (evidencia as Record<string, Json | undefined>).evidencia_textual;
+  const descripcion = (evidencia as Record<string, Json | undefined>)
+    .descripcion;
+  const evidenciaTextual = (evidencia as Record<string, Json | undefined>)
+    .evidencia_textual;
   return {
     codigo: tipo.trim(),
     descripcion: typeof descripcion === "string" ? descripcion.trim() : null,
-    evidenciaTextual: typeof evidenciaTextual === "string" ? evidenciaTextual.trim() : null,
+    evidenciaTextual:
+      typeof evidenciaTextual === "string" ? evidenciaTextual.trim() : null,
   };
 }
 
@@ -585,10 +599,15 @@ export async function cargarReglasSenal(
     const supabase = await clienteMotor(opciones?.supabase);
     const reglas = await cargarReglasAplicables(supabase, pacienteId, vertical);
     return reglas
-      .filter((r): r is ReglaEvaluable & { condicion: CondSenal } =>
-        r.condicion.tipo === "senal",
+      .filter(
+        (r): r is ReglaEvaluable & { condicion: CondSenal } =>
+          r.condicion.tipo === "senal",
       )
-      .map((r) => ({ codigo: r.condicion.codigo, nivel: r.nivel, nombre: r.nombre }));
+      .map((r) => ({
+        codigo: r.condicion.codigo,
+        nivel: r.nivel,
+        nombre: r.nombre,
+      }));
   } catch {
     // Sin acceso de servicio (env ausente) o error: sin reglas → conservador.
     return [];

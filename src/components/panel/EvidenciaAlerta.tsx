@@ -22,7 +22,8 @@ function mensajeCoincideConSenal(
   if (!texto) return false;
   return senalesSinRegla.some((senal) => {
     const codigo = typeof senal.codigo === "string" ? senal.codigo : "";
-    const descripcion = typeof senal.descripcion === "string" ? senal.descripcion : "";
+    const descripcion =
+      typeof senal.descripcion === "string" ? senal.descripcion : "";
     const evidenciaTextual =
       typeof senal.evidenciaTextual === "string" ? senal.evidenciaTextual : "";
     const candidatos = [codigo, descripcion, evidenciaTextual].filter(Boolean);
@@ -108,8 +109,12 @@ export default function EvidenciaAlerta({ evidencia }: { evidencia: Json }) {
                 ? (m as Record<string, Json | undefined>)
                 : {};
             const rol = typeof rec.rol === "string" ? rec.rol : "";
-            const contenido = typeof rec.contenido === "string" ? rec.contenido : "";
-            const resaltado = mensajeCoincideConSenal(contenido, senalesSinRegla);
+            const contenido =
+              typeof rec.contenido === "string" ? rec.contenido : "";
+            const resaltado = mensajeCoincideConSenal(
+              contenido,
+              senalesSinRegla,
+            );
             return (
               <p
                 key={`m-${i}`}

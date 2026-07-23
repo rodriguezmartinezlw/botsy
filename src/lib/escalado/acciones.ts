@@ -19,7 +19,11 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BaseDatos, Json, NivelRiesgo } from "@/types/db";
-import { nivelMaximoRiesgo, normalizarCodigoSenal, type NivelSenal } from "./senales";
+import {
+  nivelMaximoRiesgo,
+  normalizarCodigoSenal,
+  type NivelSenal,
+} from "./senales";
 import type { EvaluacionCheckin } from "./motor";
 
 type ClienteBD = SupabaseClient<BaseDatos>;
@@ -88,7 +92,10 @@ export async function aplicarEscalado(
   evaluacion: EvaluacionCheckin,
   repo: RepositorioAcciones,
 ): Promise<ResultadoAcciones> {
-  if (evaluacion.nivel === "normal" || evaluacion.reglasDisparadas.length === 0) {
+  if (
+    evaluacion.nivel === "normal" ||
+    evaluacion.reglasDisparadas.length === 0
+  ) {
     return {
       alertasCreadas: 0,
       nivel: "normal",
@@ -130,7 +137,10 @@ export async function aplicarEscalado(
     alertasCreadas += 1;
   }
 
-  const riesgoFinal = nivelMaximoRiesgo(evaluacion.riesgoActual, evaluacion.nivel);
+  const riesgoFinal = nivelMaximoRiesgo(
+    evaluacion.riesgoActual,
+    evaluacion.nivel,
+  );
 
   // Solo se escribe (riesgo/auditoría) cuando hubo una escalada nueva:
   // así re-evaluar un check-in ya escalado no genera efectos adicionales.
@@ -260,7 +270,9 @@ export async function aplicarEscaladoSenalGenerica(
 // --- Implementación Supabase (service-role) ---------------------------------
 
 /** Crea el repositorio de acciones respaldado por un cliente Supabase de servicio. */
-export function crearRepositorioAcciones(supabase: ClienteBD): RepositorioAcciones {
+export function crearRepositorioAcciones(
+  supabase: ClienteBD,
+): RepositorioAcciones {
   return {
     async alertaExiste(checkinId, reglaId) {
       const { data } = await supabase
@@ -302,7 +314,8 @@ export function crearRepositorioAcciones(supabase: ClienteBD): RepositorioAccion
         .from("checkins")
         .update({ riesgo: nivel })
         .eq("id", checkinId);
-      if (error) throw new Error("No se pudo actualizar el riesgo del check-in.");
+      if (error)
+        throw new Error("No se pudo actualizar el riesgo del check-in.");
     },
 
     async registrarAuditoria(evento) {

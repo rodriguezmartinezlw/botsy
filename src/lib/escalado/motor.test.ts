@@ -45,7 +45,11 @@ const REGLA_TORACICO_DISNEA: ReglaEvaluable = {
   condicion: cond({
     tipo: "combinacion",
     todas: [
-      { tipo: "observacion", dominio: "sintoma_fisico", codigo: "dolor_toracico" },
+      {
+        tipo: "observacion",
+        dominio: "sintoma_fisico",
+        codigo: "dolor_toracico",
+      },
       { tipo: "observacion", dominio: "sintoma_fisico", codigo: "disnea" },
     ],
   }),
@@ -123,7 +127,9 @@ describe("evaluarReglas — escenarios de las reglas semilla (0003)", () => {
     expect(r.reglasDisparadas).toHaveLength(1);
     expect(r.reglasDisparadas[0].nombre).toBe("Dolor torácico con disnea");
     // La evidencia incluye las dos observaciones implicadas.
-    const codigos = r.reglasDisparadas[0].evidencia.observaciones.map((o) => o.codigo);
+    const codigos = r.reglasDisparadas[0].evidencia.observaciones.map(
+      (o) => o.codigo,
+    );
     expect(codigos).toEqual(
       expect.arrayContaining(["dolor_toracico", "disnea"]),
     );
@@ -459,7 +465,10 @@ describe("aplicarEscaladoSenalGenerica — señal sin regla configurada", () => 
 
   it("es idempotente: no crea una segunda alerta genérica en el mismo check-in", async () => {
     const m = repoAccionesMemoria();
-    await aplicarEscaladoSenalGenerica(evaluacionSenalGenerica("contactar"), m.repo);
+    await aplicarEscaladoSenalGenerica(
+      evaluacionSenalGenerica("contactar"),
+      m.repo,
+    );
     const r2 = await aplicarEscaladoSenalGenerica(
       evaluacionSenalGenerica("urgencia"),
       m.repo,
@@ -492,7 +501,11 @@ describe("aplicarEscaladoSenalGenerica — señal sin regla configurada", () => 
 
 describe("evaluarSenal — clasificación en vivo con reglas", () => {
   const REGLAS_SENAL: ReglaSenal[] = [
-    { codigo: "ideacion_autolitica", nivel: "urgencia", nombre: "Ideación autolítica" },
+    {
+      codigo: "ideacion_autolitica",
+      nivel: "urgencia",
+      nombre: "Ideación autolítica",
+    },
   ];
 
   it("una señal que casa una regla urgencia se eleva en vivo", () => {
@@ -553,7 +566,11 @@ describe("textos al paciente — reglas clínicas de CLAUDE.md", () => {
       .toLowerCase();
     for (const p of prohibidas) expect(textos).not.toContain(p);
     // Y distinguen explícitamente señal de diagnóstico.
-    expect(TEXTOS_URGENCIA.aclaracionSenal.toLowerCase()).toContain("no es un diagnóstico");
-    expect(TEXTOS_CONTACTAR.aclaracionSenal.toLowerCase()).toContain("no un diagnóstico");
+    expect(TEXTOS_URGENCIA.aclaracionSenal.toLowerCase()).toContain(
+      "no es un diagnóstico",
+    );
+    expect(TEXTOS_CONTACTAR.aclaracionSenal.toLowerCase()).toContain(
+      "no un diagnóstico",
+    );
   });
 });
