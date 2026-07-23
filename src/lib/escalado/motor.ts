@@ -182,6 +182,8 @@ export type DatosEvaluacion = {
   observaciones: ObservacionEval[];
   /** Códigos de señal detectados en vivo en este check-in (para `senal`). */
   senales: string[];
+  /** Contexto detallado de cada señal detectada (para enriquecer la evidencia). */
+  senalesContexto?: ContextoSenal[];
   /** Serie histórica por día y dominio, incluida la de hoy (para `tendencia`). */
   historico: PuntoHistorico[];
   /** Adherencia a fármacos críticos por día (para `adherencia_critica`). */
@@ -481,6 +483,12 @@ export function evaluarReglas(
 // Carga de datos + reglas (IO) y `evaluarCheckin`
 // =====================================================================
 
+export type ContextoSenal = {
+  codigo: string;
+  descripcion?: string | null;
+  evidenciaTextual?: string | null;
+};
+
 export type EvaluacionCheckin = {
   checkinId: string;
   pacienteId: string;
@@ -496,6 +504,8 @@ export type EvaluacionCheckin = {
    * `contactar`/`urgencia` pero ninguna regla la cubre (WP-08, punto b).
    */
   senalesDetectadas: string[];
+  /** Contexto detallado de cada señal detectada para enriquecer la evidencia. */
+  senalesContexto?: ContextoSenal[];
 };
 
 const RESULTADO_VACIO = (checkinId: string): EvaluacionCheckin => ({
@@ -506,6 +516,7 @@ const RESULTADO_VACIO = (checkinId: string): EvaluacionCheckin => ({
   reglasDisparadas: [],
   mensajesRelevantes: [],
   senalesDetectadas: [],
+  senalesContexto: [],
 });
 
 async function clienteMotor(inyectado?: ClienteBD): Promise<ClienteBD> {
@@ -514,7 +525,7 @@ async function clienteMotor(inyectado?: ClienteBD): Promise<ClienteBD> {
   return crearClienteAdmin();
 }
 
-function extraerCodigoSenal(detalle: Json | null): string | null {
+function extraerContextoSenal(detalle: Json | null): ContextoSenal | null {
   if (!detalle || typeof detalle !== "object" || Array.isArray(detalle)) {
     return null;
   }
@@ -523,7 +534,16 @@ function extraerCodigoSenal(detalle: Json | null): string | null {
     return null;
   }
   const tipo = (evidencia as Record<string, Json | undefined>).tipo;
-  return typeof tipo === "string" && tipo.length > 0 ? tipo : null;
+  if (typeof tipo !== "string" || tipo.trim().length === 0) {
+    return null;
+  }
+  const descripcion = (evidencia as Record<string, Json | undefined>).descripcion;
+  const evidenciaTextual = (evidencia as Record<string, Json | undefined>).evidencia_textual;
+  return {
+    codigo: tipo.trim(),
+    descripcion: typeof descripcion === "string" ? descripcion.trim() : null,
+    evidenciaTextual: typeof evidenciaTextual === "string" ? evidenciaTextual.trim() : null,
+  };
 }
 
 /** Carga las reglas activas aplicables (globales + del paciente + su vertical). */
@@ -623,9 +643,12 @@ async function cargarDatosEvaluacion(
   ]);
 
   const senales: string[] = [];
+  const senalesContexto: ContextoSenal[] = [];
   for (const e of eventos ?? []) {
-    const cod = extraerCodigoSenal(e.detalle);
-    if (cod) senales.push(cod);
+    const contexto = extraerContextoSenal(e.detalle);
+    if (!contexto) continue;
+    senales.push(contexto.codigo);
+    senalesContexto.push(contexto);
   }
 
   const fechaPorCheckin = new Map<string, string>();
@@ -679,6 +702,7 @@ async function cargarDatosEvaluacion(
       valorNum: o.valor_num,
     })),
     senales,
+    senalesContexto,
     historico,
     adherenciaCritica,
     instrumentos: (instrumentos ?? []).map((r) => ({
@@ -757,5 +781,6 @@ export async function evaluarCheckin(
     reglasDisparadas,
     mensajesRelevantes,
     senalesDetectadas: datos.senales,
+    senalesContexto: datos.senalesContexto,
   };
 }

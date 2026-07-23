@@ -429,6 +429,34 @@ describe("aplicarEscaladoSenalGenerica — señal sin regla configurada", () => 
     expect(JSON.stringify(m.audits[0].detalle)).toContain("senal_generica");
   });
 
+  it("incluye el código de la señal en el motivo y en la evidencia", async () => {
+    const m = repoAccionesMemoria();
+    const res = await aplicarEscaladoSenalGenerica(
+      {
+        ...evaluacionSenalGenerica("contactar"),
+        senalesContexto: [
+          {
+            codigo: "herida_enrojecida",
+            descripcion: "Herida enrojecida",
+            evidenciaTextual: "Tengo una herida enrojecida en la pierna.",
+          },
+        ],
+      },
+      m.repo,
+    );
+    expect(res.alertasCreadas).toBe(1);
+    expect(m.alertas[0].motivo).toBe(
+      "Señal de alarma sin regla configurada (herida_enrojecida)",
+    );
+    const evidencia = m.alertas[0].evidencia as Record<string, unknown>;
+    expect(evidencia.senales_sin_regla).toEqual([
+      expect.objectContaining({
+        codigo: "herida_enrojecida",
+        evidenciaTextual: "Tengo una herida enrojecida en la pierna.",
+      }),
+    ]);
+  });
+
   it("es idempotente: no crea una segunda alerta genérica en el mismo check-in", async () => {
     const m = repoAccionesMemoria();
     await aplicarEscaladoSenalGenerica(evaluacionSenalGenerica("contactar"), m.repo);

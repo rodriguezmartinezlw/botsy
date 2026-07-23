@@ -149,12 +149,13 @@ update public.perfiles
 update public.perfiles set telefono = '+34600111222'
   where id = '00000000-0000-4000-8000-000000000002'; -- Dra. García
 
--- El patrocinador financia AMBOS programas de mama (toda la cohorte: sin acotar
--- por país/institución -> pais_codigo/institucion_id quedan NULL = todo, WP-22 §6).
+-- El patrocinador financia los programas de mama y el programa pediátrico (toda
+-- la cohorte: sin acotar por país/institución -> pais_codigo/institucion_id quedan
+-- NULL = todo, WP-22 §6).
 insert into public.programas_patrocinados (patrocinador_id, programa_id, etiqueta_cohorte, activo)
 select '00000000-0000-4000-8000-000000000a01', p.id, p.nombre, true
 from public.programas p
-where p.clave in ('mama_terapia_oral', 'mama_tratamiento_activo')
+where p.clave in ('mama_terapia_oral', 'mama_tratamiento_activo', 'onco_pediatrico_general')
 on conflict (patrocinador_id, programa_id) do nothing;
 
 -- ---------------------------------------------------------------------

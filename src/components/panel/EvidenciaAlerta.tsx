@@ -6,6 +6,33 @@ import type { Json } from "@/types/db";
  * `observaciones[]`, `senales[]`, `mensajes[]`, y en el seed también `fragmento`.
  * Se valida cada campo antes de usarlo (nunca se confía en la forma del JSON).
  */
+function normalizarTextoBusqueda(valor: string): string {
+  return valor
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
+function mensajeCoincideConSenal(
+  mensaje: string,
+  senalesSinRegla: Array<Record<string, unknown>>,
+): boolean {
+  const texto = normalizarTextoBusqueda(mensaje);
+  if (!texto) return false;
+  return senalesSinRegla.some((senal) => {
+    const codigo = typeof senal.codigo === "string" ? senal.codigo : "";
+    const descripcion = typeof senal.descripcion === "string" ? senal.descripcion : "";
+    const evidenciaTextual =
+      typeof senal.evidenciaTextual === "string" ? senal.evidenciaTextual : "";
+    const candidatos = [codigo, descripcion, evidenciaTextual].filter(Boolean);
+    return candidatos.some((c) => {
+      const normalizado = normalizarTextoBusqueda(c);
+      return normalizado.length > 0 && texto.includes(normalizado);
+    });
+  });
+}
+
 export default function EvidenciaAlerta({ evidencia }: { evidencia: Json }) {
   if (!evidencia || typeof evidencia !== "object" || Array.isArray(evidencia)) {
     return <p className="text-sm text-texto-suave">Sin evidencia adjunta.</p>;
@@ -15,6 +42,9 @@ export default function EvidenciaAlerta({ evidencia }: { evidencia: Json }) {
   const observaciones = Array.isArray(e.observaciones) ? e.observaciones : [];
   const mensajes = Array.isArray(e.mensajes) ? e.mensajes : [];
   const senales = Array.isArray(e.senales) ? e.senales : [];
+  const senalesSinRegla = Array.isArray(e.senales_sin_regla)
+    ? (e.senales_sin_regla as Array<Record<string, Json | undefined>>)
+    : [];
   const fragmento = typeof e.fragmento === "string" ? e.fragmento : null;
 
   return (
@@ -79,8 +109,14 @@ export default function EvidenciaAlerta({ evidencia }: { evidencia: Json }) {
                 : {};
             const rol = typeof rec.rol === "string" ? rec.rol : "";
             const contenido = typeof rec.contenido === "string" ? rec.contenido : "";
+            const resaltado = mensajeCoincideConSenal(contenido, senalesSinRegla);
             return (
-              <p key={`m-${i}`} className="text-texto-suave">
+              <p
+                key={`m-${i}`}
+                className={`rounded-md px-2 py-1 text-texto-suave ${
+                  resaltado ? "bg-[#fee2e2] text-[#b91c1c]" : ""
+                }`}
+              >
                 <span className="font-semibold">
                   {rol === "paciente" ? "Paciente" : "Botsy"}:
                 </span>{" "}

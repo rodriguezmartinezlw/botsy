@@ -19,7 +19,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BaseDatos, Json, NivelRiesgo } from "@/types/db";
-import { nivelMaximoRiesgo, type NivelSenal } from "./senales";
+import { nivelMaximoRiesgo, normalizarCodigoSenal, type NivelSenal } from "./senales";
 import type { EvaluacionCheckin } from "./motor";
 
 type ClienteBD = SupabaseClient<BaseDatos>;
@@ -198,6 +198,21 @@ export async function aplicarEscaladoSenalGenerica(
     return { alertasCreadas: 0, nivel, riesgoFinal: nivel };
   }
 
+  const senalesContexto = (evaluacion.senalesContexto ?? [])
+    .filter((s) => !!s?.codigo)
+    .map((s) => ({
+      codigo: normalizarCodigoSenal(s.codigo),
+      descripcion: s.descripcion ?? null,
+      evidenciaTextual: s.evidenciaTextual ?? null,
+    }));
+
+  const motivo =
+    senalesContexto.length > 0
+      ? `Señal de alarma sin regla configurada (${senalesContexto
+          .map((s) => s.codigo)
+          .join(", ")})`
+      : "Señal de alarma sin regla configurada";
+
   const evidencia: Json = {
     detalle: [
       "Señal de alarma detectada durante el check-in que no coincide con ninguna regla configurada.",
@@ -206,6 +221,7 @@ export async function aplicarEscaladoSenalGenerica(
     // observaciones; el panel es defensivo, pero mantenemos la clave presente).
     observaciones: [],
     senales: evaluacion.senalesDetectadas,
+    senales_sin_regla: senalesContexto,
     mensajes: evaluacion.mensajesRelevantes.map((m) => ({
       rol: m.rol,
       contenido: m.contenido,
@@ -217,7 +233,7 @@ export async function aplicarEscaladoSenalGenerica(
     checkinId: evaluacion.checkinId,
     reglaId: null,
     nivel,
-    motivo: "Señal de alarma sin regla configurada",
+    motivo,
     evidencia,
   });
 

@@ -259,3 +259,55 @@ values (
   true
 )
 on conflict (clave) do nothing;
+
+-- 3) Programa pediátrico de cáncer: seguimiento diario orientado a cuidador
+--    y síntomas frecuentes de tratamiento, con reglas básicas [PENDIENTE CLÍNICO].
+insert into public.programas (clave, nombre, descripcion, version, config, activo)
+values (
+  'onco_pediatrico_general',
+  'Oncología pediátrica · General',
+  'Seguimiento diario para niños con cáncer y sus cuidadores: síntomas, estado general y apoyo emocional en fases de tratamiento y seguimiento.',
+  1,
+  '{
+    "modulos": { "voz": true, "texto": true, "recomendaciones": true },
+    "perfil_graficos": { "dolor": true, "animo": true, "adherencia": true, "sintomas": true, "sueno": true, "cognicion": true },
+    "checkin": {
+      "frecuencia": "diaria",
+      "dominios": ["adherencia", "sintomas_fisicos", "animo", "dolor"],
+      "preguntas_extra": [
+        { "clave": "fiebre", "texto": "¿Ha tenido fiebre hoy?", "dominio": "sintomas_fisicos" },
+        { "clave": "dolor", "texto": "¿Ha tenido dolor o molestias importantes hoy?", "dominio": "dolor" },
+        { "clave": "estado_general", "texto": "¿Cómo ha estado hoy en general?", "dominio": "animo" }
+      ],
+      "estilo": { "ritmo": "calmado", "frases_cortas": true, "repeticion": false }
+    },
+    "escalado": {
+      "reglas_clave": [
+        {
+          "clave": "fiebre_pediatrica",
+          "nombre": "Fiebre en pediatría",
+          "descripcion": "[PENDIENTE CLÍNICO] Fiebre >= 38 grados en pediatría -> contactar.",
+          "nivel": "contactar",
+          "condicion": { "tipo": "observacion", "dominio": "sintoma_fisico", "codigo": "fiebre", "valor_num_gte": 38 }
+        },
+        {
+          "clave": "dolor_intenso_pediatrico",
+          "nombre": "Dolor intenso en pediatría",
+          "descripcion": "[PENDIENTE CLÍNICO] Dolor intenso >= 7 -> contactar.",
+          "nivel": "contactar",
+          "condicion": { "tipo": "observacion", "dominio": "dolor", "codigo": "dolor", "valor_num_gte": 7 }
+        },
+        {
+          "clave": "estado_general_alto_riesgo",
+          "nombre": "Estado general comprometido",
+          "descripcion": "[PENDIENTE CLÍNICO] Estado general empeorando -> contactar.",
+          "nivel": "contactar",
+          "condicion": { "tipo": "observacion", "dominio": "animo", "codigo": "estado_general", "valor_num_lte": 3 }
+        }
+      ]
+    },
+    "instrumentos": { "termometro_distres": { "activo": false, "frecuencia": "semanal" } }
+  }'::jsonb,
+  true
+)
+on conflict (clave) do nothing;
